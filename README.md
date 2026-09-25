@@ -1,7 +1,8 @@
-# CUBEWELL
+# BREACH.EXE
 
-A 3D top-down block-dropping game in the spirit of the 1989 arcade/PC classic *Blockout*.
-You look straight down into a pit and drop 3D pieces into it. A layer disappears when it is completely filled.
+A 3D top-down block-dropping game in the spirit of the 1989 arcade/PC classic *Blockout*, reskinned as a hacking terminal.
+You look straight down into a firewall and drop exploit packets into it. A firewall layer is breached when it is completely filled.
+The trace meter rises as the stack grows. If it reaches the top, the trace completes and the connection is terminated.
 
 **Play:** https://andrewmonroe-dev.github.io/Cubewell/
 
@@ -35,11 +36,11 @@ Touch devices get on-screen buttons.
 
 ## Modes
 
-- **Flat Fun**: 5×5×12 pit, flat pieces
-- **3D Mania**: 3×3×10 pit, basic 3D pieces
-- **Out of Control**: 5×5×10 pit, extended pieces including pentacubes
-- **Custom**: choose width, depth, height and piece set
+- **Script Kiddie**: 5×5×12 firewall, flat exploits
+- **Black ICE**: 3×3×10 firewall, 3D exploits
+- **Zero Day**: 5×5×10 firewall, full exploit kit including pentacubes
+- **Custom Target**: choose nodes, firewall layers and exploit kit
 
-High scores are saved in your browser, one per pit size and piece set.
+Best hauls are saved in your browser, one per firewall size and exploit kit.
 
-The whole game is a single `index.html` with no build step and no dependencies.
+The whole game is a single `index.html` with no build step. Its only outside resources are two Google Fonts, VT323 and Share Tech Mono, and it falls back to system monospace fonts if they don't load.
