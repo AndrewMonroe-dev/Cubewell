@@ -34,6 +34,10 @@ Pressing any key hands control back to the keyboard until the mouse moves again.
 
 Touch devices get on-screen buttons.
 
+## Sound
+
+All sound is synthesized live with Web Audio, so there are no audio files. It includes a dial-up modem connect, keyboard clicks, data chirps, an access-denied buzz, modem bursts when you breach a layer, trace alarms and a flatline when you get caught. Press **M** to mute.
+
 ## Modes
 
 - **Script Kiddie**: 5×5×12 firewall, flat exploits
