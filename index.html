@@ -6,122 +6,151 @@
 <title>BREACH.EXE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #010502;
-    --panel: rgba(0, 18, 6, .82);
-    --line: #0f7a35;
-    --glow: #00ff66;
-    --text: #9dffbf;
-    --dim: #3f9a5c;
+    --bg: #020604;
+    --panel: rgba(4, 22, 12, .62);
+    --line: rgba(0, 255, 120, .18);
+    --glow: #00ff78;
+    --cyan: #00e5ff;
+    --text: #c8ffe0;
+    --dim: #4f9c72;
     --accent: #d4ff3a;
     --warn: #ffb000;
     --bad: #ff2d55;
-    --mono: "Share Tech Mono", "Consolas", "Courier New", ui-monospace, monospace;
-    --crt: "VT323", "Share Tech Mono", "Consolas", monospace;
+    --mono: "JetBrains Mono", "Consolas", ui-monospace, monospace;
+    --disp: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+    --cut: 14px;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-    font-family: var(--mono); overflow: hidden;
-    touch-action: none; user-select: none; -webkit-user-select: none; }
-  #rain { position: fixed; inset: 0; z-index: 0; opacity: .22; pointer-events: none; }
-  #crt { position: fixed; inset: 0; z-index: 50; pointer-events: none;
+  html, body { margin: 0; height: 100%; color: var(--text); font-family: var(--mono); overflow: hidden;
+    touch-action: none; user-select: none; -webkit-user-select: none;
     background:
-      repeating-linear-gradient(to bottom, rgba(0,0,0,.28) 0 1px, transparent 1px 3px),
-      radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.65) 100%);
-    animation: flicker 6s infinite steps(1); }
-  @keyframes flicker { 0%, 100% { opacity: 1; } 47% { opacity: .86; } 48% { opacity: 1; } 91% { opacity: .92; } }
-  #app { position: relative; z-index: 1; display: flex; height: 100%; align-items: center; justify-content: center; gap: 14px; padding: 12px; }
-  #traceCol { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; }
-  #traceCol .lbl { font-family: var(--crt); font-size: 18px; color: var(--dim); letter-spacing: .1em; }
-  #tracePct { font-family: var(--crt); font-size: 20px; color: var(--glow); }
-  #meter { width: 26px; height: 60vh; border: 1px solid var(--line); display: flex;
-    flex-direction: column-reverse; padding: 2px; gap: 2px; flex: none; box-shadow: 0 0 10px rgba(0,255,102,.25); }
-  #meter div { flex: 1; background: #010a04; transition: background .2s; }
+      radial-gradient(ellipse 70% 60% at 50% 45%, rgba(0,255,120,.07), transparent 70%),
+      radial-gradient(circle, rgba(0,255,120,.09) 1px, transparent 1.5px) 0 0 / 28px 28px,
+      var(--bg); }
+  #rain { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  #app { position: relative; z-index: 1; display: flex; height: 100%; align-items: center; justify-content: center; gap: 18px; padding: 12px; }
+
+  /* ---- trace meter: angled segments ---- */
+  #traceCol { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; }
+  #traceCol .lbl { font-family: var(--disp); font-weight: 600; font-size: 11px; color: var(--dim); letter-spacing: .3em;
+    writing-mode: vertical-rl; transform: rotate(180deg); }
+  #tracePct { font-family: var(--disp); font-weight: 700; font-size: 18px; color: var(--glow); }
+  #meter { width: 18px; height: 60vh; display: flex; flex-direction: column-reverse; gap: 3px; flex: none; }
+  #meter div { flex: 1; background: rgba(0,255,120,.06);
+    clip-path: polygon(0 35%, 100% 0, 100% 65%, 0 100%); transition: background .25s; }
+
+  /* ---- play field ---- */
   #wrap { position: relative; flex: none; }
-  canvas#c { display: block; background: #000; cursor: crosshair;
-    box-shadow: 0 0 0 1px var(--line), 0 0 24px rgba(0,255,102,.18); }
-  #hud { width: 230px; flex: none; display: flex; flex-direction: column; gap: 8px; }
-  .box { border: 1px solid var(--line); padding: 7px 10px; background: var(--panel);
-    box-shadow: inset 0 0 12px rgba(0,255,102,.08); }
-  .box h3 { margin: 0 0 2px; font-size: 11px; letter-spacing: .18em; color: var(--dim); font-weight: normal; }
-  .box h3::before { content: "// "; }
-  .big { font-family: var(--crt); font-size: 34px; line-height: 1; color: var(--accent);
-    text-shadow: 0 0 8px rgba(212,255,58,.6); font-variant-numeric: tabular-nums; }
-  .row { display: flex; justify-content: space-between; font-size: 13px; line-height: 1.65; }
-  .row b { color: var(--accent); font-weight: normal; }
-  .keys { font-size: 11px; line-height: 1.55; color: var(--dim); }
-  .keys b { color: var(--text); font-weight: normal; }
-  #log { height: 150px; overflow: hidden; font-size: 11px; line-height: 1.45; display: flex;
-    flex-direction: column; justify-content: flex-end; white-space: nowrap; }
-  #log div { overflow: hidden; text-overflow: ellipsis; }
+  canvas#c { display: block; cursor: crosshair; background: rgba(0,0,0,.55);
+    clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px); }
+
+  /* ---- HUD panels: chamfered glass ---- */
+  #hud { width: 240px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .box { position: relative; padding: 9px 12px 9px 14px; background: var(--panel);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+    box-shadow: inset 0 0 0 1px var(--line); }
+  .box::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--glow);
+    box-shadow: 0 0 8px var(--glow); }
+  .box::after { content: ""; position: absolute; top: 0; right: 0; width: var(--cut); height: var(--cut);
+    background: linear-gradient(to bottom left, transparent calc(50% - 1.5px), var(--glow) 50%, transparent calc(50% + 1.5px)); }
+  .box h3 { margin: 0 0 3px; font-family: var(--disp); font-size: 10px; font-weight: 600; letter-spacing: .28em;
+    color: var(--dim); }
+  .big { font-family: var(--disp); font-weight: 700; font-size: 32px; line-height: 1.05; color: var(--accent);
+    letter-spacing: .02em; text-shadow: 0 0 16px rgba(212,255,58,.35); font-variant-numeric: tabular-nums; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; line-height: 1.9;
+    letter-spacing: .12em; color: var(--dim); font-family: var(--disp); font-weight: 600; }
+  .row b { font-family: var(--mono); color: var(--text); font-weight: 500; letter-spacing: 0; font-size: 13px; }
+  .keys { font-size: 10.5px; line-height: 1.7; color: var(--dim); }
+  .keys b { color: var(--text); font-weight: 500; }
+  #log { height: 150px; overflow: hidden; font-size: 10.5px; line-height: 1.55; display: flex;
+    flex-direction: column; justify-content: flex-end; white-space: nowrap; color: var(--dim); }
+  #log div { overflow: hidden; text-overflow: ellipsis; animation: slidein .25s ease-out; }
+  @keyframes slidein { from { opacity: 0; transform: translateX(-6px); } }
   #log .ok { color: var(--glow); } #log .warn { color: var(--warn); } #log .bad { color: var(--bad); }
-  #log .sys { color: var(--dim); }
-  #log div:last-child::after { content: "█"; animation: blink 1s steps(1) infinite; margin-left: 2px; }
+  #log div:last-child::after { content: ""; display: inline-block; width: 6px; height: 11px; margin-left: 4px;
+    vertical-align: -1px; background: var(--glow); animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
   [hidden] { display: none !important; }
+
+  /* ---- menus ---- */
   #overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
-    background: rgba(0,6,2,.84); overflow-y: auto; }
-  .menu { text-align: center; padding: 18px; width: min(460px, 94%); }
-  .boot { text-align: left; font-size: 12px; color: var(--dim); margin: 0 0 14px; min-height: 7.5em; line-height: 1.5; }
+    background: radial-gradient(ellipse at center, rgba(2,14,8,.78), rgba(0,0,0,.9));
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); overflow-y: auto; }
+  .menu { text-align: center; padding: 20px; width: min(560px, 94%); }
+  .boot { text-align: left; font-size: 11px; color: var(--dim); margin: 0 0 18px; min-height: 8em; line-height: 1.6;
+    border-left: 1px solid var(--line); padding-left: 12px; }
+  .boot div { animation: slidein .25s ease-out; }
   .boot .ok { color: var(--glow); }
-  .title { font-family: var(--crt); font-size: clamp(46px, 11vw, 84px); line-height: .9; letter-spacing: .06em;
-    color: var(--glow); margin: 0 0 4px; position: relative; display: inline-block;
-    text-shadow: 0 0 10px rgba(0,255,102,.8), 0 0 30px rgba(0,255,102,.35); }
-  .title::before, .title::after { content: attr(data-t); position: absolute; inset: 0; opacity: .8; }
-  .title::before { color: #ff2d55; animation: glitch1 3.2s infinite steps(1); }
-  .title::after  { color: #00e5ff; animation: glitch2 2.7s infinite steps(1); }
-  @keyframes glitch1 { 0%, 92%, 100% { transform: none; clip-path: inset(100% 0 0 0); }
-    93% { transform: translate(-4px, 1px); clip-path: inset(20% 0 55% 0); }
-    95% { transform: translate(3px, -1px); clip-path: inset(62% 0 10% 0); } }
-  @keyframes glitch2 { 0%, 88%, 100% { transform: none; clip-path: inset(100% 0 0 0); }
-    89% { transform: translate(4px, 0); clip-path: inset(40% 0 35% 0); }
-    91% { transform: translate(-3px, 1px); clip-path: inset(5% 0 80% 0); } }
-  .sub { color: var(--dim); font-size: 12px; margin-bottom: 16px; letter-spacing: .25em; }
+  .title { font-family: var(--disp); font-weight: 700; font-size: clamp(44px, 10vw, 86px); line-height: .9;
+    letter-spacing: .04em; margin: 0 0 8px; position: relative; display: inline-block;
+    background: linear-gradient(100deg, #eafff3 0%, var(--glow) 45%, var(--cyan) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(0,255,120,.35)); }
+  .title::before, .title::after { content: attr(data-t); position: absolute; inset: 0; -webkit-background-clip: text; background-clip: text; }
+  .title::before { background: var(--bad); animation: glitch1 4.2s infinite steps(1); }
+  .title::after  { background: var(--cyan); animation: glitch2 3.7s infinite steps(1); }
+  @keyframes glitch1 { 0%, 94%, 100% { transform: none; clip-path: inset(100% 0 0 0); }
+    95% { transform: translate(-5px, 0); clip-path: inset(22% 0 58% 0); }
+    96.5% { transform: translate(4px, 0); clip-path: inset(64% 0 12% 0); } }
+  @keyframes glitch2 { 0%, 90%, 100% { transform: none; clip-path: inset(100% 0 0 0); }
+    91% { transform: translate(5px, 0); clip-path: inset(42% 0 36% 0); }
+    92.5% { transform: translate(-3px, 0); clip-path: inset(6% 0 82% 0); } }
+  .sub { color: var(--dim); font-family: var(--disp); font-weight: 600; font-size: 12px; margin-bottom: 22px; letter-spacing: .38em; }
   .modes { display: grid; gap: 8px; margin-bottom: 12px; }
-  button { font: inherit; color: var(--text); background: rgba(0,40,14,.6); border: 1px solid var(--line);
-    padding: 9px 12px; cursor: pointer; text-align: left; letter-spacing: .08em; }
-  button::before { content: "  "; white-space: pre; color: var(--glow); }
-  button:hover, button:focus-visible { background: rgba(0,90,30,.55); outline: none; color: #fff;
-    box-shadow: 0 0 12px rgba(0,255,102,.35); }
-  button:hover::before, button:focus-visible::before, button.sel::before { content: "> "; }
-  button.sel { border-color: var(--glow); color: var(--glow); background: rgba(0,70,24,.6); }
-  .mode small { display: block; color: var(--dim); font-size: 11px; padding-left: 2ch; }
-  .go { text-align: center; font-family: var(--crt); font-size: 26px; color: var(--glow); border-color: var(--glow); }
-  .go::before { content: "" !important; }
-  .custom { display: grid; grid-template-columns: auto auto; gap: 6px 10px; justify-content: center;
-    font-size: 13px; margin: 8px 0 12px; align-items: center; text-align: left; color: var(--dim); }
-  select { font: inherit; background: #000; color: var(--text); border: 1px solid var(--line); padding: 2px 4px; }
-  .msg { font-family: var(--crt); font-size: 44px; line-height: 1; color: var(--bad); margin-bottom: 6px;
-    text-shadow: 0 0 12px rgba(255,45,85,.7); }
-  .msg.ok { color: var(--glow); text-shadow: 0 0 12px rgba(0,255,102,.7); }
-  .msg2 { color: var(--dim); letter-spacing: .2em; font-size: 12px; margin-bottom: 14px; }
-  .haul { font-family: var(--crt); font-size: 30px; color: var(--accent); margin-bottom: 4px; }
+  .modes:has(.mode) { grid-template-columns: 1fr 1fr; }
+  button { position: relative; font-family: var(--disp); font-weight: 600; font-size: 14px; letter-spacing: .14em;
+    color: var(--text); background: rgba(0,255,120,.05); border: 0; padding: 12px 16px; cursor: pointer; text-align: left;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    box-shadow: inset 0 0 0 1px var(--line); transition: background .15s, color .15s, box-shadow .15s; }
+  button:hover, button:focus-visible { background: rgba(0,255,120,.13); outline: none; color: #fff;
+    box-shadow: inset 0 0 0 1px rgba(0,255,120,.55); }
+  button.sel { background: linear-gradient(90deg, rgba(0,255,120,.2), rgba(0,255,120,.05)); color: var(--glow);
+    box-shadow: inset 3px 0 0 var(--glow), inset 0 0 0 1px rgba(0,255,120,.5); }
+  .mode small { display: block; font-family: var(--mono); font-weight: 400; letter-spacing: 0; color: var(--dim);
+    font-size: 10.5px; margin-top: 3px; }
+  .go { text-align: center; font-size: 17px; font-weight: 700; letter-spacing: .3em; color: #02140a;
+    background: linear-gradient(90deg, var(--glow), var(--cyan)); box-shadow: 0 0 24px rgba(0,255,120,.35); }
+  .go:hover, .go:focus-visible { color: #000; background: linear-gradient(90deg, #6bffb0, #7ff1ff); box-shadow: 0 0 30px rgba(0,255,120,.6); }
+  .custom { display: grid; grid-template-columns: auto auto; gap: 8px 12px; justify-content: center;
+    font-family: var(--disp); font-weight: 600; letter-spacing: .12em; font-size: 12px; margin: 10px 0 14px;
+    align-items: center; text-align: left; color: var(--dim); }
+  select { font: 500 13px var(--mono); background: rgba(0,0,0,.6); color: var(--text); border: 1px solid var(--line);
+    padding: 4px 6px; border-radius: 0; }
+  .msg { font-family: var(--disp); font-weight: 700; font-size: clamp(34px, 7vw, 54px); line-height: 1; color: var(--bad);
+    margin-bottom: 8px; letter-spacing: .04em; text-shadow: 0 0 24px rgba(255,45,85,.45); }
+  .msg.ok { color: var(--glow); text-shadow: 0 0 24px rgba(0,255,120,.45); }
+  .msg2 { color: var(--dim); font-family: var(--disp); font-weight: 600; letter-spacing: .32em; font-size: 11px; margin-bottom: 16px; }
+  .haul { font-family: var(--disp); font-weight: 700; font-size: 38px; color: var(--accent); margin-bottom: 4px;
+    text-shadow: 0 0 20px rgba(212,255,58,.35); }
+
+  /* ---- touch + narrow screens ---- */
   #touch { display: none; }
   @media (pointer: coarse) { #touch { display: grid; } }
   @media (max-width: 800px), (max-aspect-ratio: 1/1) {
     #app { flex-direction: column; justify-content: flex-start; gap: 8px; padding: 8px; }
     #traceCol { display: none; }
     #hud { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 6px; order: -1; }
-    #hud .box { flex: 1 1 0; padding: 4px 8px; min-width: 0; }
+    #hud .box { flex: 1 1 0; padding: 5px 8px 5px 10px; min-width: 0; }
     #hud .keys-box, #hud .info-box, #hud .log-box { display: none; }
-    .big { font-size: 24px; }
-    .row { font-size: 12px; line-height: 1.4; }
+    .big { font-size: 22px; }
+    .row { line-height: 1.5; }
+    .modes:has(.mode) { grid-template-columns: 1fr; }
   }
   #touch { position: relative; z-index: 1; grid-template-columns: repeat(6, 1fr); gap: 6px; width: 100%; max-width: 520px; }
-  #touch button { padding: 12px 0; font-size: 16px; touch-action: manipulation; text-align: center; }
-  #touch button::before { content: ""; }
-  #touch .drop { grid-column: span 2; border-color: var(--accent); color: var(--accent); }
+  #touch button { padding: 13px 0; font-size: 15px; touch-action: manipulation; text-align: center; letter-spacing: 0; }
+  #touch .drop { grid-column: span 2; color: #02140a; background: linear-gradient(90deg, var(--glow), var(--cyan)); }
   @media (prefers-reduced-motion: reduce) {
-    #rain { display: none; } #crt { animation: none; }
+    #rain { display: none; }
     .title::before, .title::after { display: none; }
   }
 </style>
 </head>
 <body>
 <canvas id="rain"></canvas>
-<div id="crt"></div>
 <div id="app">
   <div id="traceCol">
     <span class="lbl">TRACE</span>
@@ -289,7 +318,7 @@ function resize() {
     const reserved = 70 + (touch ? 140 : 0);
     size = Math.min(innerWidth - 16, innerHeight - reserved);
   } else {
-    size = Math.min(innerHeight - 24, innerWidth - 60 - 230 - 70);
+    size = Math.min(innerHeight - 24, innerWidth - 50 - 240 - 80);
   }
   size = Math.max(220, Math.floor(size));
   const aspect = W / D;
@@ -298,7 +327,7 @@ function resize() {
   dpr = window.devicePixelRatio || 1;
   cv.width = cw * dpr; cv.height = ch * dpr;
   cv.style.width = cw + "px"; cv.style.height = ch + "px";
-  $("meter").style.height = Math.max(120, ch - 70) + "px";
+  $("meter").style.height = Math.max(120, ch - 130) + "px";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   scale = Math.min(cw / W, ch / D) * 0.96;
   camF = H * 0.75;
@@ -528,8 +557,7 @@ function updateMeter() {
     if (any && z < top) top = z;
     if (m[layerFromBottom]) {
       const h = layerHue(layerFromBottom);
-      m[layerFromBottom].style.background = any ? `hsl(${h},100%,45%)` : "#010a04";
-      m[layerFromBottom].style.boxShadow = any ? `0 0 6px hsl(${h},100%,50%)` : "none";
+      m[layerFromBottom].style.background = any ? `hsl(${h},100%,50%)` : "rgba(0,255,120,.06)";
     }
   }
   const pct = Math.round((H - top) / H * 100);
@@ -544,48 +572,101 @@ function updateMeter() {
 }
 
 // ---------- Animation ----------
-function startAnim(a) { a.start = performance.now(); anim = a; }
+function startAnim(a) { a.start = performance.now(); a.cells = piece.cells; anim = a; }
 
-function animEdges(now) {
-  if (!anim) return outlineEdges(piece.cells);
+// returns a function mapping a vertex of the pre-move shape to its animated position, or null when idle
+function animMapper(now) {
+  if (!anim) return null;
   let t = (now - anim.start) / anim.dur;
-  if (t >= 1) { anim = null; return outlineEdges(piece.cells); }
+  if (t >= 1) { anim = null; return null; }
   t = 1 - (1 - t) * (1 - t);
   const d = anim.delta;
-  if (anim.type === "move") {
-    return anim.edges.map(e => e.map(v => [v[0] + d[0] * t, v[1] + d[1] * t, v[2] + d[2] * t]));
-  }
+  if (anim.type === "move") return v => [v[0] + d[0] * t, v[1] + d[1] * t, v[2] + d[2] * t];
   const c = anim.center;
-  return anim.edges.map(e => e.map(v => {
+  return v => {
     const r = rotVec([v[0]-c[0], v[1]-c[1], v[2]-c[2]], anim.axis, anim.ang * t);
     return [r[0] + c[0] + d[0] * t, r[1] + c[1] + d[1] * t, r[2] + c[2] + d[2] * t];
-  }));
+  };
+}
+
+// outer faces of a polycube, as quads (for the hologram fill)
+function outerFaces(cells) {
+  const S = new Set(cells.map(c => c.join(",")));
+  const has = (x, y, z) => S.has(x + "," + y + "," + z);
+  const out = [];
+  for (const [x, y, z] of cells) {
+    if (!has(x, y, z - 1)) out.push([[x,y,z],[x+1,y,z],[x+1,y+1,z],[x,y+1,z]]);
+    if (!has(x - 1, y, z)) out.push([[x,y,z],[x,y+1,z],[x,y+1,z+1],[x,y,z+1]]);
+    if (!has(x + 1, y, z)) out.push([[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]]);
+    if (!has(x, y - 1, z)) out.push([[x,y,z],[x+1,y,z],[x+1,y,z+1],[x,y,z+1]]);
+    if (!has(x, y + 1, z)) out.push([[x,y+1,z],[x+1,y+1,z],[x+1,y+1,z+1],[x,y+1,z+1]]);
+  }
+  return out;
 }
 
 // ---------- Rendering ----------
-function drawPit() {
-  ctx.save();
-  ctx.lineWidth = 1;
-  // depth rings fade as they go down
-  for (let z = 0; z <= H; z++) {
-    const a = proj(0,0,z), b = proj(W,0,z), c = proj(W,D,z), d = proj(0,D,z);
-    ctx.strokeStyle = `rgba(0,255,102,${.55 - .38 * z / H})`;
-    ctx.beginPath();
-    ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.lineTo(c[0],c[1]); ctx.lineTo(d[0],d[1]); ctx.closePath();
-    ctx.stroke();
-  }
-  ctx.strokeStyle = "rgba(0,255,102,.28)";
-  ctx.shadowColor = "#00ff66"; ctx.shadowBlur = 4;
+function quad(pts) {
   ctx.beginPath();
-  for (let x = 0; x <= W; x++) for (const y of [0, D]) { const a = proj(x,y,0), b = proj(x,y,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  pts.forEach((p, i) => { const s = proj(p[0], p[1], p[2]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); });
+  ctx.closePath();
+}
+
+function drawPit(now) {
+  ctx.save();
+  // floor glow
+  const f0 = proj(0, 0, H), f1 = proj(W, D, H);
+  const g = ctx.createRadialGradient(cw / 2, ch / 2, 0, cw / 2, ch / 2, Math.max(f1[0] - f0[0], f1[1] - f0[1]) * .8);
+  g.addColorStop(0, "rgba(0,255,120,.10)"); g.addColorStop(1, "rgba(0,255,120,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(f0[0], f0[1], f1[0] - f0[0], f1[1] - f0[1]);
+
+  ctx.lineWidth = 1;
+  // faint depth rings
+  ctx.strokeStyle = "rgba(0,255,120,.07)";
+  ctx.beginPath();
+  for (let z = 1; z < H; z++) {
+    const a = proj(0,0,z), b = proj(W,0,z), c = proj(W,D,z), d = proj(0,D,z);
+    ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.lineTo(c[0],c[1]); ctx.lineTo(d[0],d[1]); ctx.closePath();
+  }
+  // wall + floor grid
+  for (let x = 1; x < W; x++) for (const y of [0, D]) { const a = proj(x,y,0), b = proj(x,y,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
   for (let y = 1; y < D; y++) for (const x of [0, W]) { const a = proj(x,y,0), b = proj(x,y,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(0,255,120,.16)";
+  ctx.beginPath();
   for (let x = 1; x < W; x++) { const a = proj(x,0,H), b = proj(x,D,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
   for (let y = 1; y < D; y++) { const a = proj(0,y,H), b = proj(W,y,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
   ctx.stroke();
+
+  // crisp structural lines: the four corner edges, the rim and the floor outline
+  ctx.strokeStyle = "rgba(0,255,120,.5)";
+  ctx.shadowColor = "#00ff78"; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  for (const [x, y] of [[0,0],[W,0],[W,D],[0,D]]) { const a = proj(x,y,0), b = proj(x,y,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  for (const z of [0, H]) {
+    const a = proj(0,0,z), b = proj(W,0,z), c = proj(W,D,z), d = proj(0,D,z);
+    ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.lineTo(c[0],c[1]); ctx.lineTo(d[0],d[1]); ctx.closePath();
+  }
+  ctx.stroke();
+
+  // scanning ring sweeping down the shaft
+  if (!reducedMotion) {
+    const sz = ((now / 1000) * 2.2) % (H + 4) - 2;
+    if (sz > 0 && sz < H) {
+      const a = proj(0,0,sz), b = proj(W,0,sz), c = proj(W,D,sz), d = proj(0,D,sz);
+      const fade = Math.sin(Math.PI * sz / H);
+      ctx.strokeStyle = `rgba(0,229,255,${.45 * fade})`;
+      ctx.shadowColor = "#00e5ff"; ctx.shadowBlur = 14;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.lineTo(c[0],c[1]); ctx.lineTo(d[0],d[1]); ctx.closePath();
+      ctx.stroke();
+    }
+  }
   ctx.restore();
 }
 
-// landed cubes are "data blocks": dark glass faces, neon edges, a hex byte on top
+// landed cubes: smoked-glass data blocks with crisp neon edges and a hex byte on top
 function drawCubes(now) {
   const cam = [W / 2, D / 2, -camF];
   const faces = [];
@@ -602,68 +683,133 @@ function drawCubes(now) {
       faces.push({ pts, h, f, lit, top, byte, d: (cx-cam[0])**2 + (cy-cam[1])**2 + (cz-cam[2])**2 });
     };
     if (z === 0 || !filled(x, y, z - 1)) add([[x,y,z],[x+1,y,z],[x+1,y+1,z],[x,y+1,z]], 1, true);
-    if (x > 0 && cam[0] < x && !filled(x - 1, y, z)) add([[x,y,z],[x,y+1,z],[x,y+1,z+1],[x,y,z+1]], .6);
-    if (x + 1 < W && cam[0] > x + 1 && !filled(x + 1, y, z)) add([[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]], .6);
-    if (y > 0 && cam[1] < y && !filled(x, y - 1, z)) add([[x,y,z],[x+1,y,z],[x+1,y,z+1],[x,y,z+1]], .45);
-    if (y + 1 < D && cam[1] > y + 1 && !filled(x, y + 1, z)) add([[x,y+1,z],[x+1,y+1,z],[x+1,y+1,z+1],[x,y+1,z+1]], .45);
+    if (x > 0 && cam[0] < x && !filled(x - 1, y, z)) add([[x,y,z],[x,y+1,z],[x,y+1,z+1],[x,y,z+1]], .55);
+    if (x + 1 < W && cam[0] > x + 1 && !filled(x + 1, y, z)) add([[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]], .55);
+    if (y > 0 && cam[1] < y && !filled(x, y - 1, z)) add([[x,y,z],[x+1,y,z],[x+1,y,z+1],[x,y,z+1]], .4);
+    if (y + 1 < D && cam[1] > y + 1 && !filled(x, y + 1, z)) add([[x,y+1,z],[x+1,y+1,z],[x+1,y+1,z+1],[x,y+1,z+1]], .4);
   }
   faces.sort((a, b) => b.d - a.d);
-  ctx.lineWidth = 1;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const fc of faces) {
     const s = fc.pts.map(p => proj(p[0], p[1], p[2]));
     ctx.beginPath();
     s.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]));
     ctx.closePath();
-    ctx.fillStyle = fc.lit ? `hsl(${fc.h},100%,82%)` : `hsl(${fc.h},100%,${5 + 11 * fc.f}%)`;
+    if (fc.lit) {
+      ctx.fillStyle = `hsl(${fc.h},100%,80%)`;
+    } else if (fc.top) {
+      // diagonal sheen across the top face
+      const gr = ctx.createLinearGradient(s[0][0], s[0][1], s[2][0], s[2][1]);
+      gr.addColorStop(0, `hsl(${fc.h},85%,20%)`);
+      gr.addColorStop(1, `hsl(${fc.h},90%,9%)`);
+      ctx.fillStyle = gr;
+    } else {
+      ctx.fillStyle = `hsl(${fc.h},90%,${4 + 9 * fc.f}%)`;
+    }
     ctx.fill();
-    ctx.strokeStyle = fc.lit ? "#fff" : `hsla(${fc.h},100%,${40 + 18 * fc.f}%,.95)`;
+    ctx.lineWidth = fc.top ? 1.25 : 1;
+    ctx.strokeStyle = fc.lit ? "#fff" : `hsla(${fc.h},100%,${45 + 17 * fc.f}%,${fc.top ? 1 : .7})`;
     ctx.stroke();
-    if (fc.top) {
+    if (fc.top && !fc.lit) {
       const size = Math.abs(s[1][0] - s[0][0]);
-      if (size > 16) {
-        ctx.font = `${Math.round(size * .42)}px VT323, "Share Tech Mono", monospace`;
-        ctx.fillStyle = fc.lit ? "#001a08" : `hsla(${fc.h},100%,62%,.85)`;
+      // inset panel line with a clipped corner
+      const ix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      const k = .16;
+      const p0 = ix(s[0], s[2], k), p2 = ix(s[2], s[0], k), p1 = ix(s[1], s[3], k), p3 = ix(s[3], s[1], k);
+      const cut = ix(p1, p2, .3), cut2 = ix(p1, p0, .3);
+      ctx.beginPath();
+      ctx.moveTo(p0[0], p0[1]); ctx.lineTo(cut2[0], cut2[1]); ctx.lineTo(cut[0], cut[1]);
+      ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]); ctx.closePath();
+      ctx.strokeStyle = `hsla(${fc.h},100%,60%,.22)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      if (size > 20) {
+        ctx.font = `500 ${Math.round(size * .26)}px "JetBrains Mono", monospace`;
+        ctx.fillStyle = `hsla(${fc.h},100%,70%,.7)`;
         ctx.fillText(fc.byte.toString(16).toUpperCase().padStart(2, "0"), (s[0][0] + s[2][0]) / 2, (s[0][1] + s[2][1]) / 2 + 1);
       }
     }
   }
 }
 
-function drawEdges(edges, style, width, glow = 0, dash = null) {
-  ctx.save();
-  ctx.strokeStyle = style; ctx.lineWidth = width;
-  if (glow) { ctx.shadowColor = style; ctx.shadowBlur = glow; }
-  if (dash) ctx.setLineDash(dash);
+function strokeEdges(edges, map) {
   ctx.beginPath();
   for (const [a, b] of edges) {
-    const p = proj(a[0], a[1], a[2]), q = proj(b[0], b[1], b[2]);
+    const A = map ? map(a) : a, B = map ? map(b) : b;
+    const p = proj(A[0], A[1], A[2]), q = proj(B[0], B[1], B[2]);
     ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]);
   }
   ctx.stroke();
+}
+
+// the falling piece: translucent hologram faces, a wide soft glow and a bright thin core line
+function drawHologram(cells, map, hue = 150) {
+  ctx.save();
+  ctx.fillStyle = `hsla(${hue},100%,60%,.07)`;
+  for (const f of outerFaces(cells)) { quad(map ? f.map(map) : f); ctx.fill(); }
+  const edges = outlineEdges(cells);
+  ctx.strokeStyle = `hsla(${hue},100%,60%,.35)`;
+  ctx.lineWidth = 5; ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.shadowColor = `hsl(${hue},100%,55%)`; ctx.shadowBlur = 18;
+  strokeEdges(edges, map);
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#effff6"; ctx.lineWidth = 1.4;
+  strokeEdges(edges, map);
   ctx.restore();
 }
 
-function drawScreenText(now) {
-  // corner telemetry, like a HUD burned into the monitor
+function drawGhost(cells) {
   ctx.save();
-  ctx.font = `${Math.max(11, Math.round(cw / 52))}px "Share Tech Mono", monospace`;
-  ctx.fillStyle = "rgba(0,255,102,.55)";
+  ctx.strokeStyle = "rgba(0,229,255,.5)"; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+  strokeEdges(outlineEdges(cells));
+  ctx.restore();
+}
+
+// HUD furniture burned onto the field: corner brackets, telemetry, banner
+function drawScreenText(now) {
+  ctx.save();
+  const m = 10, L = Math.max(18, cw * .05);
+  ctx.strokeStyle = "rgba(0,255,120,.75)"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  // top-left and bottom-right are chamfered by the canvas clip, so bracket the other two and add angled ticks
+  ctx.moveTo(cw - m - L, m); ctx.lineTo(cw - m, m); ctx.lineTo(cw - m, m + L);
+  ctx.moveTo(m, ch - m - L); ctx.lineTo(m, ch - m); ctx.lineTo(m + L, ch - m);
+  ctx.moveTo(m + 14, m + 2); ctx.lineTo(m + 2, m + 14);
+  ctx.moveTo(cw - m - 2, ch - m - 14); ctx.lineTo(cw - m - 14, ch - m - 2);
+  ctx.stroke();
+
+  const fs = Math.max(10, Math.round(cw / 64));
+  ctx.font = `500 ${fs}px "JetBrains Mono", monospace`;
+  ctx.fillStyle = "rgba(0,255,120,.6)";
   ctx.textBaseline = "top"; ctx.textAlign = "left";
-  ctx.fillText(`TGT ${session.ip}:${session.port}`, 8, 6);
+  ctx.fillText(`TGT ${session.ip}:${session.port}`, m + 26, m + 4);
   ctx.textAlign = "right";
-  ctx.fillText(`FW-LAYERS ${H}  NODE ${W}x${D}`, cw - 8, 6);
+  ctx.fillText(`FW ${H}L · NODE ${W}×${D}`, cw - m - L - 8, m + 4);
   ctx.textBaseline = "bottom"; ctx.textAlign = "left";
-  ctx.fillText(`PKT 0x${hexStream(now)}`, 8, ch - 6);
+  ctx.fillText(`PKT 0x${hexStream(now)}`, m + L + 8, ch - m - 4);
   ctx.textAlign = "right";
-  ctx.fillText(state === "paused" ? "SESSION SUSPENDED" : `UPLINK ${(38 + 6 * Math.sin(now / 700)).toFixed(1)} Mb/s`, cw - 8, ch - 6);
+  ctx.fillText(state === "paused" ? "SESSION SUSPENDED" : `UPLINK ${(38 + 6 * Math.sin(now / 700)).toFixed(1)} Mb/s`, cw - m - 26, ch - m - 4);
+
   if (now < flashUntil) {
-    const jitter = Math.random() < .25 ? (Math.random() - .5) * 8 : 0;
-    ctx.font = `${Math.round(cw / 8.5)}px VT323, monospace`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.shadowColor = flashCol; ctx.shadowBlur = 18;
-    ctx.fillStyle = flashCol;
-    ctx.fillText(flashMsg, cw / 2 + jitter, ch / 2);
+    // angled banner that wipes in, holds, and fades
+    const age = now - (flashUntil - 1400);
+    const inT = Math.min(1, age / 160), outT = Math.min(1, (flashUntil - now) / 250);
+    const bh = Math.max(44, ch * .11), y = ch / 2 - bh / 2, sk = bh * .6;
+    const bw = cw * .86 * inT, x = (cw - bw) / 2;
+    ctx.globalAlpha = outT;
+    ctx.beginPath();
+    ctx.moveTo(x + sk, y); ctx.lineTo(x + bw, y); ctx.lineTo(x + bw - sk, y + bh); ctx.lineTo(x, y + bh); ctx.closePath();
+    ctx.fillStyle = "rgba(2,14,8,.86)"; ctx.fill();
+    ctx.strokeStyle = flashCol; ctx.lineWidth = 1.5;
+    ctx.shadowColor = flashCol; ctx.shadowBlur = 16;
+    ctx.stroke();
+    if (inT >= 1) {
+      ctx.font = `700 ${Math.round(bh * .5)}px "Chakra Petch", sans-serif`;
+      ctx.letterSpacing = `${Math.round(bh * .08)}px`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = flashCol;
+      ctx.fillText(flashMsg, cw / 2, ch / 2 + 1);
+    }
   }
   ctx.restore();
 }
@@ -672,54 +818,60 @@ function hexStream(now) { if (now - hexT > 120) { hexCache = hex(8); hexT = now;
 const session = { ip: "0.0.0.0", port: 22 };
 
 function render(now) {
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, cw, ch);
+  ctx.clearRect(0, 0, cw, ch);
   if (!pit) { drawAttract(now); return; }
-  drawPit();
+  drawPit(now);
   drawCubes(now);
   if (piece && (state === "play" || state === "paused")) {
     if (ghost) {
       let g = piece.cells;
       while (fits(shift(g, [0,0,1]))) g = shift(g, [0,0,1]);
-      drawEdges(outlineEdges(g), "rgba(0,229,255,.45)", 1, 0, [4, 4]);
+      drawGhost(g);
     }
-    drawEdges(animEdges(now), "#b8ffd4", 2, 14);
+    const map = animMapper(now);
+    drawHologram(map ? anim.cells : piece.cells, map);
   }
   drawScreenText(now);
 }
 
 // spinning demo piece behind the title menu
 function drawAttract(now) {
-  drawPit();
+  drawPit(now);
   const t = now / 1000;
-  const edges = outlineEdges(P.TWR).map(e => e.map(v => {
+  drawHologram(P.TWR, v => {
     let r = [v[0] - 1, v[1] - 1, v[2] - 1];
     r = rotVec(r, 0, t * .7); r = rotVec(r, 1, t * .9); r = rotVec(r, 2, t * .4);
     return [r[0] + W / 2, r[1] + D / 2, r[2] + H * .35];
-  }));
-  drawEdges(edges, "#b8ffd4", 2, 14);
+  });
 }
 
-// ---------- Matrix rain (background) ----------
+// ---------- Background: falling light streaks ----------
 const rain = document.getElementById("rain"), rctx = rain.getContext("2d");
-const GLYPHS = "01アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF<>/{}[]#$%&*";
-let drops = [], rainT = 0;
+let streaks = [], rainT = 0;
 function resizeRain() {
   rain.width = innerWidth; rain.height = innerHeight;
-  drops = Array.from({ length: Math.ceil(innerWidth / 16) }, () => Math.random() * innerHeight / 16);
+  const n = Math.round(innerWidth / 38);
+  streaks = Array.from({ length: n }, () => newStreak(true));
+}
+function newStreak(anywhere) {
+  return { x: Math.round(Math.random() * innerWidth / 14) * 14 + .5, y: anywhere ? Math.random() * innerHeight : -200,
+           len: 40 + Math.random() * 160, v: 1.5 + Math.random() * 5, a: .08 + Math.random() * .22 };
 }
 function drawRain(now) {
-  if (now - rainT < 55) return;
+  if (now - rainT < 33) return;
   rainT = now;
-  rctx.fillStyle = "rgba(1,5,2,.16)";
-  rctx.fillRect(0, 0, rain.width, rain.height);
-  rctx.font = "15px VT323, monospace";
-  for (let i = 0; i < drops.length; i++) {
-    const y = drops[i] * 16;
-    rctx.fillStyle = Math.random() < .06 ? "#d4ffe0" : "#00c850";
-    rctx.fillText(GLYPHS[Math.floor(Math.random() * GLYPHS.length)], i * 16, y);
-    if (y > rain.height && Math.random() > .975) drops[i] = 0;
-    drops[i] += 1;
+  rctx.clearRect(0, 0, rain.width, rain.height);
+  rctx.lineWidth = 1;
+  for (const s of streaks) {
+    const g = rctx.createLinearGradient(0, s.y - s.len, 0, s.y);
+    g.addColorStop(0, "rgba(0,255,120,0)");
+    g.addColorStop(1, `rgba(0,255,120,${s.a})`);
+    rctx.strokeStyle = g;
+    rctx.beginPath(); rctx.moveTo(s.x, s.y - s.len); rctx.lineTo(s.x, s.y); rctx.stroke();
+    rctx.fillStyle = `rgba(180,255,215,${s.a * 1.6})`;
+    rctx.fillRect(s.x - 1, s.y - 1, 2, 2);
+    s.y += s.v;
+    if (s.y - s.len > innerHeight) Object.assign(s, newStreak(false));
   }
 }
 

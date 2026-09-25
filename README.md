@@ -47,4 +47,4 @@ All sound is synthesized live with Web Audio, so there are no audio files. It in
 
 Best hauls are saved in your browser, one per firewall size and exploit kit.
 
-The whole game is a single `index.html` with no build step. Its only outside resources are two Google Fonts, VT323 and Share Tech Mono, and it falls back to system monospace fonts if they don't load.
+The whole game is a single `index.html` with no build step. Its only outside resources are two Google Fonts, Chakra Petch and JetBrains Mono, and it falls back to system monospace fonts if they don't load.
