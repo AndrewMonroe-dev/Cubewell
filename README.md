@@ -32,6 +32,8 @@ The trace meter rises as the stack grows. If it reaches the top, the trace compl
 
 Pressing any key hands control back to the keyboard until the mouse moves again.
 
+**Rotation sensitivity** (Low / Medium / High, in the menu) sets how far you right-drag per quarter-turn and the minimum pause between turns. Holding a rotate key does not auto-repeat.
+
 Touch devices get on-screen buttons.
 
 ## Sound

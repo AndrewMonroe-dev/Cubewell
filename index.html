@@ -414,7 +414,7 @@ function tryRotate(axis, dir) {
     const cand = shift(rotated, k);
     if (fits(cand)) {
       startAnim({ type: "rot", edges: outlineEdges(piece.cells), axis, ang, center: c,
-                  delta: [snap[0] + k[0], snap[1] + k[1], snap[2] + k[2]], dur: 110 });
+                  delta: [snap[0] + k[0], snap[1] + k[1], snap[2] + k[2]], dur: 190 });
       piece.cells = cand;
       sfx.rotate();
       return;
@@ -579,7 +579,8 @@ function animMapper(now) {
   if (!anim) return null;
   let t = (now - anim.start) / anim.dur;
   if (t >= 1) { anim = null; return null; }
-  t = 1 - (1 - t) * (1 - t);
+  // moves ease out; rotations ease in and out so the turn reads clearly
+  t = anim.type === "move" ? 1 - (1 - t) * (1 - t) : t < .5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
   const d = anim.delta;
   if (anim.type === "move") return v => [v[0] + d[0] * t, v[1] + d[1] * t, v[2] + d[2] * t];
   const c = anim.center;
@@ -928,7 +929,8 @@ addEventListener("keydown", e => {
   const a = keymap[e.code];
   if (!a || state !== "play") return;
   e.preventDefault();
-  if (a === "drop" && e.repeat) return;
+  // holding a rotate or drop key does not auto-repeat: one press, one action
+  if (e.repeat && (a === "drop" || /^r[xyz]$/i.test(a))) return;
   mouse.active = false;   // keyboard takes over until the mouse moves again
   actions[a]();
 });
@@ -936,8 +938,16 @@ addEventListener("keydown", e => {
 // ---------- Mouse ----------
 // move = steer, double-click = drop, wheel / right-click = spin flat,
 // right-drag left-right = roll sideways, right-drag up-down = tip forward/back
-const mouse = { active: false, x: 0, y: 0, rdown: false, rx: 0, ry: 0, twisted: false, wheel: 0, wheelT: 0, wheelLast: 0 };
-const TWIST_PX = 36;
+const mouse = { active: false, x: 0, y: 0, rdown: false, rx: 0, ry: 0, twisted: false, axis: null, twistT: 0,
+                wheel: 0, wheelT: 0, wheelLast: 0 };
+// rotation sensitivity: drag distance per quarter-turn and the minimum pause between turns
+const SENS = {
+  low:    { label: "LOW",    px: 130, cool: 380 },
+  medium: { label: "MEDIUM", px: 85,  cool: 260 },
+  high:   { label: "HIGH",   px: 50,  cool: 160 },
+};
+let sensKey = store.get("sens", "medium");
+if (!SENS[sensKey]) sensKey = "medium";
 
 function followMouse() {
   const r = cv.getBoundingClientRect();
@@ -960,14 +970,19 @@ function followMouse() {
 addEventListener("pointermove", e => {
   if (e.pointerType !== "mouse") return;
   if (mouse.rdown) {
-    const dx = e.clientX - mouse.rx, dy = e.clientY - mouse.ry;
     if (state !== "play") return;
-    if (Math.abs(dx) >= TWIST_PX && Math.abs(dx) >= Math.abs(dy)) {
-      actions[dx > 0 ? "rY" : "ry"]();
-      mouse.rx += Math.sign(dx) * TWIST_PX; mouse.ry = e.clientY; mouse.twisted = true;
-    } else if (Math.abs(dy) >= TWIST_PX) {
-      actions[dy > 0 ? "rx" : "rX"]();
-      mouse.ry += Math.sign(dy) * TWIST_PX; mouse.rx = e.clientX; mouse.twisted = true;
+    const dx = e.clientX - mouse.rx, dy = e.clientY - mouse.ry;
+    // lock each drag to the direction it started in, so a sloppy diagonal never tips when you meant to roll
+    if (!mouse.axis && Math.hypot(dx, dy) > 14) mouse.axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+    if (!mouse.axis) return;
+    const dist = mouse.axis === "x" ? dx : dy;
+    const now = performance.now(), sens = SENS[sensKey];
+    if (Math.abs(dist) >= sens.px && now - mouse.twistT >= sens.cool) {
+      if (mouse.axis === "x") actions[dx > 0 ? "rY" : "ry"]();
+      else actions[dy > 0 ? "rx" : "rX"]();
+      // restart the measurement from here so extra movement is not banked up as queued turns
+      mouse.rx = e.clientX; mouse.ry = e.clientY;
+      mouse.twisted = true; mouse.twistT = now;
     }
     return;
   }
@@ -980,7 +995,7 @@ cv.addEventListener("pointerdown", e => {
   if (e.pointerType !== "mouse") return;
   ensureAudio();
   if (e.button === 2) {
-    mouse.rdown = true; mouse.twisted = false;
+    mouse.rdown = true; mouse.twisted = false; mouse.axis = null;
     mouse.rx = e.clientX; mouse.ry = e.clientY;
     cv.setPointerCapture(e.pointerId);
   }
@@ -988,7 +1003,8 @@ cv.addEventListener("pointerdown", e => {
 addEventListener("pointerup", e => {
   if (e.pointerType !== "mouse" || e.button !== 2 || !mouse.rdown) return;
   mouse.rdown = false;
-  if (!mouse.twisted && state === "play") actions.rz();
+  // a plain right-click spins; a drag that started but never completed a turn does nothing
+  if (!mouse.twisted && !mouse.axis && state === "play") actions.rz();
   // steer from where the pointer ended up, without a jump on the next nudge
   mouse.x = e.clientX; mouse.y = e.clientY;
 });
@@ -1001,7 +1017,8 @@ cv.addEventListener("wheel", e => {
   if (now - mouse.wheelLast > 300) mouse.wheel = 0;   // new scroll gesture
   mouse.wheelLast = now;
   mouse.wheel += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
-  if (Math.abs(mouse.wheel) >= 50 && now - mouse.wheelT > 90) {   // one notch = one turn
+  if (now - mouse.wheelT < SENS[sensKey].cool) { mouse.wheel = 0; return; }   // still turning: ignore, do not queue
+  if (Math.abs(mouse.wheel) >= 50) {   // one notch = one turn
     actions[mouse.wheel > 0 ? "rz" : "rZ"]();
     mouse.wheel = 0; mouse.wheelT = now;
   }
@@ -1047,7 +1064,8 @@ function showMainMenu(fromPause) {
       <span>Firewall layers</span><select id="ch">${opts(6, 18, cust.h)}</select>
       <span>Exploit kit</span><select id="cs">${Object.keys(SETS).map(k => `<option value="${k}" ${k === cust.set ? "selected" : ""}>${SETS[k].name}</option>`).join("")}</select>
     </div>
-    <div class="custom"><span>Security tier</span><select id="lv">${opts(0, 9, startLevel)}</select></div>
+    <div class="custom"><span>Security tier</span><select id="lv">${opts(0, 9, startLevel)}</select>
+      <span>Rotation sensitivity</span><select id="sens">${Object.keys(SENS).map(k => `<option value="${k}" ${k === sensKey ? "selected" : ""}>${SENS[k].label}</option>`).join("")}</select></div>
     <div class="modes">
       ${fromPause ? '<button id="mResume">RESUME SESSION</button>' : ""}
       <button id="mStart" class="go">${fromPause ? "NEW TARGET" : "INITIATE BREACH"}</button>
@@ -1061,6 +1079,7 @@ function showMainMenu(fromPause) {
   if (fromPause) $("mResume").onclick = () => resume();
   $("mStart").onclick = () => {
     startLevel = +$("lv").value; store.set("startLevel", startLevel);
+    sensKey = $("sens").value; store.set("sens", sensKey);
     if (modeId === "custom") {
       const c = { w: +$("cw").value, d: +$("cd").value, h: +$("ch").value, set: $("cs").value };
       store.set("custom", c);
