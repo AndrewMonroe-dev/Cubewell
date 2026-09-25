@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CUBEWELL — 3D Block Drop</title>
+<style>
+  :root {
+    --bg: #000;
+    --panel: #0a0a14;
+    --line: #1f9d3a;
+    --text: #d8ffd8;
+    --dim: #6fae7a;
+    --accent: #ffe14d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: "Courier New", ui-monospace, Menlo, Consolas, monospace; overflow: hidden;
+    touch-action: none; user-select: none; -webkit-user-select: none; }
+  #app { display: flex; height: 100%; align-items: center; justify-content: center; gap: 14px; padding: 12px; }
+  #meter { width: 26px; height: min(86vh, 86vw); border: 2px solid var(--line); display: flex;
+    flex-direction: column-reverse; padding: 2px; gap: 2px; flex: none; }
+  #meter div { flex: 1; background: #050505; }
+  #wrap { position: relative; flex: none; }
+  canvas { display: block; background: #000; }
+  #hud { width: 190px; flex: none; display: flex; flex-direction: column; gap: 10px; }
+  .box { border: 2px solid var(--line); padding: 8px 10px; background: var(--panel); }
+  .box h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .15em; color: var(--dim); font-weight: normal; }
+  .big { font-size: 26px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .row { display: flex; justify-content: space-between; font-size: 14px; line-height: 1.6; }
+  .row b { color: var(--accent); font-weight: normal; }
+  .keys { font-size: 11px; line-height: 1.55; color: var(--dim); }
+  .keys b { color: var(--text); font-weight: normal; }
+  [hidden] { display: none !important; }
+  #overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.8); overflow-y: auto; }
+  #overlay[hidden] { display: none; }
+  .menu { text-align: center; padding: 18px; max-width: 94%; }
+  .title { font-size: clamp(30px, 7vw, 54px); letter-spacing: .12em; color: var(--accent);
+    text-shadow: 3px 3px 0 #b3261e, 6px 6px 0 #1f3fbf; margin: 0 0 4px; }
+  .sub { color: var(--dim); font-size: 12px; margin-bottom: 16px; letter-spacing: .2em; }
+  .modes { display: grid; gap: 8px; margin-bottom: 12px; }
+  button { font: inherit; color: var(--text); background: #06200c; border: 2px solid var(--line);
+    padding: 8px 12px; cursor: pointer; }
+  button:hover, button:focus-visible { background: #0d3a18; outline: none; color: #fff; }
+  button.sel { background: var(--line); color: #000; }
+  .mode small { display: block; color: var(--dim); font-size: 11px; }
+  button.sel small { color: #033; }
+  .custom { display: grid; grid-template-columns: auto auto; gap: 6px 10px; justify-content: center;
+    font-size: 13px; margin: 8px 0 12px; align-items: center; text-align: left; }
+  select { font: inherit; background: #000; color: var(--text); border: 1px solid var(--line); padding: 2px 4px; }
+  .msg { font-size: 22px; color: var(--accent); margin-bottom: 10px; }
+  #touch { display: none; }
+  @media (pointer: coarse) {
+    #touch { display: grid; }
+  }
+  @media (max-width: 760px), (max-aspect-ratio: 1/1) {
+    #app { flex-direction: column; justify-content: flex-start; gap: 8px; padding: 8px; }
+    #meter { display: none; }
+    #hud { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 6px; order: -1; }
+    #hud .box { flex: 1 1 0; padding: 4px 8px; min-width: 0; }
+    #hud .keys-box, #hud .info-box { display: none; }
+    .big { font-size: 18px; }
+    .row { font-size: 12px; line-height: 1.4; }
+  }
+  #touch { grid-template-columns: repeat(6, 1fr); gap: 6px; width: 100%; max-width: 520px; }
+  #touch button { padding: 12px 0; font-size: 16px; touch-action: manipulation; }
+  #touch .drop { grid-column: span 2; background: #3a2a06; border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="meter" title="Pit depth"></div>
+  <div id="wrap">
+    <canvas id="c"></canvas>
+    <div id="overlay"></div>
+  </div>
+  <div id="hud">
+    <div class="box"><h3>SCORE</h3><div class="big" id="score">0</div></div>
+    <div class="box">
+      <div class="row"><span>LEVEL</span><b id="level">0</b></div>
+      <div class="row"><span>LAYERS</span><b id="layers">0</b></div>
+      <div class="row"><span>CUBES</span><b id="cubes">0</b></div>
+      <div class="row"><span>HIGH</span><b id="high">0</b></div>
+    </div>
+    <div class="box info-box">
+      <div class="row"><span>PIT</span><b id="pitsize">5x5x12</b></div>
+      <div class="row"><span>SET</span><b id="setname">FLAT</b></div>
+    </div>
+    <div class="box keys-box keys">
+      <b>← → ↑ ↓</b> move<br>
+      <b>Q W E</b> rotate X Y Z<br>
+      <b>A S D</b> rotate back<br>
+      <b>SPACE</b> drop<br>
+      <b>G</b> ghost &nbsp; <b>M</b> sound<br>
+      <b>P</b> pause &nbsp; <b>ESC</b> menu
+    </div>
+  </div>
+  <div id="touch">
+    <button data-k="rx">⟲X</button><button data-k="ry">⟲Y</button><button data-k="rz">⟲Z</button>
+    <button data-k="up">↑</button><button data-k="drop" class="drop">DROP</button>
+    <button data-k="rX">⟳X</button><button data-k="rY">⟳Y</button><button data-k="rZ">⟳Z</button>
+    <button data-k="left">←</button><button data-k="down">↓</button><button data-k="right">→</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---------- Piece sets (polycubes as [x,y,z] cells) ----------
+const P = {
+  // flat pieces
+  I2: [[0,0,0],[1,0,0]],
+  I3: [[0,0,0],[1,0,0],[2,0,0]],
+  V3: [[0,0,0],[1,0,0],[0,1,0]],
+  I4: [[0,0,0],[1,0,0],[2,0,0],[3,0,0]],
+  O4: [[0,0,0],[1,0,0],[0,1,0],[1,1,0]],
+  L4: [[0,0,0],[1,0,0],[2,0,0],[0,1,0]],
+  T4: [[0,0,0],[1,0,0],[2,0,0],[1,1,0]],
+  S4: [[0,0,0],[1,0,0],[1,1,0],[2,1,0]],
+  // non-planar tetracubes
+  TWR: [[0,0,0],[1,0,0],[1,1,0],[1,1,1]],   // tower right
+  TWL: [[0,0,0],[1,0,0],[1,1,0],[0,0,1]],   // tower left
+  BRN: [[0,0,0],[1,0,0],[0,1,0],[0,0,1]],   // branch / corner
+  // pentacubes
+  X5: [[1,0,0],[0,1,0],[1,1,0],[2,1,0],[1,2,0]],
+  U5: [[0,0,0],[2,0,0],[0,1,0],[1,1,0],[2,1,0]],
+  P5: [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,2,0]],
+  L5: [[0,0,0],[1,0,0],[2,0,0],[3,0,0],[0,1,0]],
+  C5: [[0,0,0],[1,0,0],[1,1,0],[0,0,1],[1,0,1]],
+};
+const SETS = {
+  flat:     { name: "FLAT",     pieces: ["I2","I3","V3","I4","O4","L4","T4","S4"] },
+  basic:    { name: "BASIC",    pieces: ["I2","I3","V3","O4","L4","T4","S4","TWR","TWL","BRN"] },
+  extended: { name: "EXTENDED", pieces: ["I2","I3","V3","I4","O4","L4","T4","S4","TWR","TWL","BRN","X5","U5","P5","L5","C5"] },
+};
+const MODES = [
+  { id: "flat",  label: "FLAT FUN",       desc: "5×5×12 · flat pieces",     w: 5, d: 5, h: 12, set: "flat" },
+  { id: "mania", label: "3D MANIA",       desc: "3×3×10 · basic 3D pieces", w: 3, d: 3, h: 10, set: "basic" },
+  { id: "ooc",   label: "OUT OF CONTROL", desc: "5×5×10 · extended pieces", w: 5, d: 5, h: 10, set: "extended" },
+  { id: "custom",label: "CUSTOM",         desc: "choose pit and pieces" },
+];
+
+// EGA-flavoured layer colours, bottom layer first
+const LAYER_COLORS = ["#2a4bff","#1fbf3a","#18c8c8","#e03030","#c83cc8","#d88a20",
+                      "#b8b8b8","#6a7cff","#7cff6a","#7cffff","#ff7070","#ff80ff","#ffff55","#ffffff"];
+
+// ---------- State ----------
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const overlay = document.getElementById("overlay");
+const $ = id => document.getElementById(id);
+
+let W = 5, D = 5, H = 12, setKey = "flat", modeId = "flat", startLevel = 0;
+let pit;                // Uint8Array, 0 = empty, else 1
+let piece = null;       // { cells: [[x,y,z]...] absolute }
+let state = "menu";     // menu | play | clearing | paused | over
+let score = 0, level = 0, layers = 0, cubes = 0;
+let dropTimer = 0, clearTimer = 0, clearing = [];
+let anim = null;
+let ghost = false, sound = true;
+let lastT = 0;
+let camF = 9, scale = 40, cw = 600, ch = 600, dpr = 1;
+let bag = [];
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("cubewell." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("cubewell." + k, JSON.stringify(v)); } catch {} },
+};
+ghost = store.get("ghost", false);
+sound = store.get("sound", true);
+
+const idx = (x, y, z) => (z * D + y) * W + x;
+const filled = (x, y, z) => pit[idx(x, y, z)] !== 0;
+const highKey = () => `high.${W}x${D}x${H}.${setKey}`;
+
+// ---------- Geometry ----------
+function rotVec(v, axis, ang) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const [x, y, z] = v;
+  if (axis === 0) return [x, y * c - z * s, y * s + z * c];
+  if (axis === 1) return [x * c + z * s, y, -x * s + z * c];
+  return [x * c - y * s, x * s + y * c, z];
+}
+function bboxCenter(cells) {
+  const mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9];
+  for (const c of cells) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], c[k]); mx[k] = Math.max(mx[k], c[k] + 1); }
+  return [(mn[0]+mx[0])/2, (mn[1]+mx[1])/2, (mn[2]+mx[2])/2];
+}
+function fits(cells) {
+  for (const [x, y, z] of cells) {
+    if (x < 0 || y < 0 || z < 0 || x >= W || y >= D || z >= H) return false;
+    if (filled(x, y, z)) return false;
+  }
+  return true;
+}
+const shift = (cells, d) => cells.map(c => [c[0]+d[0], c[1]+d[1], c[2]+d[2]]);
+
+// Outline edges of a polycube: an edge is drawn unless it lies flat inside a face or inside the solid.
+function outlineEdges(cells) {
+  const S = new Set(cells.map(c => c.join(",")));
+  const has = (x, y, z) => S.has(x + "," + y + "," + z);
+  const seen = new Set(), out = [];
+  for (const [cx, cy, cz] of cells) {
+    for (let k = 0; k < 3; k++) {
+      const i = (k + 1) % 3, j = (k + 2) % 3;
+      for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) {
+        const p = [cx, cy, cz]; p[i] += a; p[j] += b;
+        const key = k + ":" + p.join(",");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const f = (da, db) => { const q = p.slice(); q[i] += da; q[j] += db; q[k] = [cx,cy,cz][k]; return has(q[0], q[1], q[2]) ? 1 : 0; };
+        const f00 = f(-1,-1), f10 = f(0,-1), f01 = f(-1,0), f11 = f(0,0);
+        const n = f00 + f10 + f01 + f11;
+        if (n === 1 || n === 3 || (n === 2 && f00 === f11)) {
+          const q = p.slice(); q[k] += 1;
+          out.push([p, q]);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// ---------- Projection ----------
+function proj(x, y, z) {
+  const k = camF / (camF + z);
+  return [cw / 2 + (x - W / 2) * scale * k, ch / 2 + (y - D / 2) * scale * k];
+}
+
+function resize() {
+  const narrow = matchMedia("(max-width: 760px), (max-aspect-ratio: 1/1)").matches;
+  const touch = matchMedia("(pointer: coarse)").matches;
+  let size;
+  if (narrow) {
+    const reserved = 70 + (touch ? 140 : 0);
+    size = Math.min(innerWidth - 16, innerHeight - reserved);
+  } else {
+    size = Math.min(innerHeight - 24, innerWidth - 26 - 190 - 60);
+  }
+  size = Math.max(220, Math.floor(size));
+  const aspect = W / D;
+  cw = aspect >= 1 ? size : Math.floor(size * aspect);
+  ch = aspect >= 1 ? Math.floor(size / aspect) : size;
+  dpr = window.devicePixelRatio || 1;
+  cv.width = cw * dpr; cv.height = ch * dpr;
+  cv.style.width = cw + "px"; cv.style.height = ch + "px";
+  $("meter").style.height = ch + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  scale = Math.min(cw / W, ch / D) * 0.96;
+  camF = H * 0.75;
+}
+
+// ---------- Game flow ----------
+function newGame() {
+  pit = new Uint8Array(W * D * H);
+  score = 0; layers = 0; cubes = 0; level = startLevel;
+  bag = []; anim = null; clearing = [];
+  resize();
+  buildMeter();
+  $("pitsize").textContent = `${W}x${D}x${H}`;
+  $("setname").textContent = SETS[setKey].name;
+  state = "play";
+  overlay.hidden = true;
+  document.activeElement?.blur();
+  spawn();
+  updateHud();
+}
+
+function nextPieceKey() {
+  if (!bag.length) {
+    bag = SETS[setKey].pieces.slice();
+    for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+  }
+  return bag.pop();
+}
+
+function spawn() {
+  let cells = P[nextPieceKey()].map(c => c.slice());
+  // random orientation keeps things lively; flat pieces stay flat
+  const turns = Math.floor(Math.random() * 4);
+  for (let t = 0; t < turns; t++) cells = cells.map(c => rotVec(c, 2, Math.PI / 2).map(Math.round));
+  // shrink any piece that is wider than the pit by standing it up (small pits)
+  const span = k => Math.max(...cells.map(c => c[k])) - Math.min(...cells.map(c => c[k])) + 1;
+  if (span(0) > W) cells = cells.map(c => rotVec(c, 2, Math.PI / 2).map(Math.round));
+  if (span(0) > W || span(1) > D) cells = cells.map(c => rotVec(c, 1, Math.PI / 2).map(Math.round));
+  const mn = [0,1,2].map(k => Math.min(...cells.map(c => c[k])));
+  const sx = span(0), sy = span(1);
+  const off = [Math.floor((W - sx) / 2) - mn[0], Math.floor((D - sy) / 2) - mn[1], -mn[2]];
+  cells = shift(cells, off);
+  if (!fits(cells)) { piece = { cells }; gameOver(); return; }
+  piece = { cells };
+  dropTimer = 0;
+}
+
+function gravityMs() { return Math.max(70, 1100 * Math.pow(0.8, level)); }
+
+function tryMove(d, animate = true) {
+  if (!piece) return false;
+  const moved = shift(piece.cells, d);
+  if (!fits(moved)) return false;
+  if (animate) startAnim({ type: "move", edges: outlineEdges(piece.cells), delta: d, dur: 70 });
+  piece.cells = moved;
+  return true;
+}
+
+function tryRotate(axis, dir) {
+  if (!piece) return;
+  const ang = dir * Math.PI / 2;
+  const c = bboxCenter(piece.cells);
+  let rotated = piece.cells.map(cell => {
+    const ctr = [cell[0] + .5 - c[0], cell[1] + .5 - c[1], cell[2] + .5 - c[2]];
+    const r = rotVec(ctr, axis, ang);
+    return [r[0] + c[0] - .5, r[1] + c[1] - .5, r[2] + c[2] - .5];
+  });
+  // snap half-cell offsets back onto the grid
+  const snap = rotated[0].map(v => Math.abs(v - Math.floor(v) - .5) < 1e-6 ? -.5 * dir : Math.round(v) - v);
+  rotated = rotated.map(r => r.map((v, k) => Math.round(v + snap[k])));
+  const kicks = [[0,0,0],[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1],
+                 [1,1,0],[-1,-1,0],[1,-1,0],[-1,1,0],[2,0,0],[-2,0,0],[0,2,0],[0,-2,0],[0,0,2]];
+  for (const k of kicks) {
+    const cand = shift(rotated, k);
+    if (fits(cand)) {
+      startAnim({ type: "rot", edges: outlineEdges(piece.cells), axis, ang, center: c,
+                  delta: [snap[0] + k[0], snap[1] + k[1], snap[2] + k[2]], dur: 110 });
+      piece.cells = cand;
+      beep(520, .03, "square", .03);
+      return;
+    }
+  }
+  beep(120, .05, "square", .03);
+}
+
+function hardDrop() {
+  if (!piece || state !== "play") return;
+  let n = 0;
+  while (fits(shift(piece.cells, [0,0,1]))) { piece.cells = shift(piece.cells, [0,0,1]); n++; }
+  anim = null;
+  score += n * (level + 1);
+  lock();
+}
+
+function lock() {
+  for (const [x, y, z] of piece.cells) pit[idx(x, y, z)] = 1;
+  cubes += piece.cells.length;
+  score += piece.cells.length * (level + 1) * 2;
+  piece = null; anim = null;
+  beep(160, .08, "triangle", .08);
+  clearing = [];
+  for (let z = 0; z < H; z++) {
+    let full = true;
+    for (let i = 0; i < W * D && full; i++) if (!pit[z * W * D + i]) full = false;
+    if (full) clearing.push(z);
+  }
+  if (clearing.length) {
+    state = "clearing"; clearTimer = performance.now();
+    [0, 1, 2].slice(0, Math.min(3, clearing.length)).forEach((_, i) => setTimeout(() => beep(440 + i * 220, .1, "square", .06), i * 90));
+  } else {
+    spawn();
+  }
+  updateHud();
+}
+
+function finishClear() {
+  const n = clearing.length;
+  const area = W * D;
+  const rows = clearing.slice().sort((a, b) => a - b);
+  for (const z of rows) {
+    // shift everything above z down one layer
+    pit.copyWithin(area, 0, z * area);
+    pit.fill(0, 0, area);
+  }
+  layers += n;
+  const base = [0, 1, 3, 7, 15, 30][Math.min(n, 5)];
+  score += base * area * 4 * (level + 1);
+  if (pit.every(v => v === 0)) { score += 50 * area * (level + 1); flashText("PIT CLEAR!"); }
+  const newLevel = Math.max(level, startLevel + Math.floor(layers / 5));
+  if (newLevel !== level) { level = newLevel; beep(880, .15, "square", .06); }
+  clearing = [];
+  state = "play";
+  spawn();
+  updateHud();
+}
+
+function gameOver() {
+  state = "over";
+  const hk = highKey();
+  const best = store.get(hk, 0);
+  const isNew = score > best;
+  if (isNew) store.set(hk, score);
+  updateHud();
+  beep(90, .5, "sawtooth", .08);
+  showMenu(`<div class="msg">GAME OVER</div><div class="row" style="justify-content:center;gap:10px">SCORE <b>${score}</b></div>
+    ${isNew ? '<div style="color:var(--accent);margin:4px 0 10px">NEW HIGH SCORE!</div>' : '<div style="height:10px"></div>'}`);
+}
+
+let flashMsg = "", flashUntil = 0;
+function flashText(t) { flashMsg = t; flashUntil = performance.now() + 1500; }
+
+function updateHud() {
+  $("score").textContent = score;
+  $("level").textContent = level;
+  $("layers").textContent = layers;
+  $("cubes").textContent = cubes;
+  $("high").textContent = Math.max(store.get(highKey(), 0), score);
+  updateMeter();
+}
+
+function buildMeter() {
+  const m = $("meter"); m.innerHTML = "";
+  for (let i = 0; i < H; i++) m.appendChild(document.createElement("div"));
+}
+function updateMeter() {
+  const m = $("meter").children;
+  for (let z = 0; z < H; z++) {
+    const layerFromBottom = H - 1 - z;
+    let any = false;
+    for (let i = 0; i < W * D && !any; i++) if (pit && pit[z * W * D + i]) any = true;
+    if (m[layerFromBottom]) m[layerFromBottom].style.background = any ? LAYER_COLORS[layerFromBottom % LAYER_COLORS.length] : "#050505";
+  }
+}
+
+// ---------- Animation ----------
+function startAnim(a) { a.start = performance.now(); anim = a; }
+
+function animEdges(now) {
+  if (!anim) return outlineEdges(piece.cells);
+  let t = (now - anim.start) / anim.dur;
+  if (t >= 1) { anim = null; return outlineEdges(piece.cells); }
+  t = 1 - (1 - t) * (1 - t);
+  const d = anim.delta;
+  if (anim.type === "move") {
+    return anim.edges.map(e => e.map(v => [v[0] + d[0] * t, v[1] + d[1] * t, v[2] + d[2] * t]));
+  }
+  const c = anim.center;
+  return anim.edges.map(e => e.map(v => {
+    const r = rotVec([v[0]-c[0], v[1]-c[1], v[2]-c[2]], anim.axis, anim.ang * t);
+    return [r[0] + c[0] + d[0] * t, r[1] + c[1] + d[1] * t, r[2] + c[2] + d[2] * t];
+  }));
+}
+
+// ---------- Rendering ----------
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, ((n >> 16) & 255) * f) | 0, g = Math.min(255, ((n >> 8) & 255) * f) | 0, b = Math.min(255, (n & 255) * f) | 0;
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawPit() {
+  ctx.strokeStyle = "#1f9d3a";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  // depth rings
+  for (let z = 0; z <= H; z++) {
+    const a = proj(0,0,z), b = proj(W,0,z), c = proj(W,D,z), d = proj(0,D,z);
+    ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.lineTo(c[0],c[1]); ctx.lineTo(d[0],d[1]); ctx.closePath();
+  }
+  // wall lines running down
+  for (let x = 0; x <= W; x++) for (const y of [0, D]) { const a = proj(x,y,0), b = proj(x,y,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  for (let y = 1; y < D; y++) for (const x of [0, W]) { const a = proj(x,y,0), b = proj(x,y,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  // floor grid
+  for (let x = 1; x < W; x++) { const a = proj(x,0,H), b = proj(x,D,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  for (let y = 1; y < D; y++) { const a = proj(0,y,H), b = proj(W,y,H); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  ctx.stroke();
+}
+
+function drawCubes(now) {
+  const cam = [W / 2, D / 2, -camF];
+  const faces = [];
+  const flash = state === "clearing" && Math.floor((now - clearTimer) / 70) % 2 === 0;
+  const clearSet = new Set(state === "clearing" ? clearing : []);
+  for (let z = 0; z < H; z++) for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) {
+    if (!filled(x, y, z)) continue;
+    const layerFromBottom = H - 1 - z;
+    const col = (clearSet.has(z) && flash) ? "#ffffff" : LAYER_COLORS[layerFromBottom % LAYER_COLORS.length];
+    const add = (pts, f) => {
+      let cx = 0, cy = 0, cz = 0; for (const p of pts) { cx += p[0]; cy += p[1]; cz += p[2]; }
+      cx /= 4; cy /= 4; cz /= 4;
+      faces.push({ pts, col, f, d: (cx-cam[0])**2 + (cy-cam[1])**2 + (cz-cam[2])**2 });
+    };
+    if (z === 0 || !filled(x, y, z - 1)) add([[x,y,z],[x+1,y,z],[x+1,y+1,z],[x,y+1,z]], 1);
+    if (x > 0 && cam[0] < x && !filled(x - 1, y, z)) add([[x,y,z],[x,y+1,z],[x,y+1,z+1],[x,y,z+1]], .62);
+    if (x + 1 < W && cam[0] > x + 1 && !filled(x + 1, y, z)) add([[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]], .62);
+    if (y > 0 && cam[1] < y && !filled(x, y - 1, z)) add([[x,y,z],[x+1,y,z],[x+1,y,z+1],[x,y,z+1]], .45);
+    if (y + 1 < D && cam[1] > y + 1 && !filled(x, y + 1, z)) add([[x,y+1,z],[x+1,y+1,z],[x+1,y+1,z+1],[x,y+1,z+1]], .45);
+  }
+  faces.sort((a, b) => b.d - a.d);
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = "#000";
+  for (const fc of faces) {
+    ctx.beginPath();
+    fc.pts.forEach((p, i) => { const s = proj(p[0], p[1], p[2]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); });
+    ctx.closePath();
+    ctx.fillStyle = shade(fc.col, fc.f);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+function drawEdges(edges, style, width) {
+  ctx.strokeStyle = style; ctx.lineWidth = width;
+  ctx.beginPath();
+  for (const [a, b] of edges) {
+    const p = proj(a[0], a[1], a[2]), q = proj(b[0], b[1], b[2]);
+    ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]);
+  }
+  ctx.stroke();
+}
+
+function render(now) {
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, cw, ch);
+  if (!pit) { drawAttract(now); return; }
+  drawPit();
+  drawCubes(now);
+  if (piece && (state === "play" || state === "paused")) {
+    if (ghost) {
+      let g = piece.cells;
+      while (fits(shift(g, [0,0,1]))) g = shift(g, [0,0,1]);
+      drawEdges(outlineEdges(g), "rgba(255,225,77,.35)", 1);
+    }
+    drawEdges(animEdges(now), "#ffffff", 2);
+  }
+  if (now < flashUntil) {
+    ctx.fillStyle = "#ffe14d"; ctx.font = `bold ${Math.round(cw / 12)}px Courier New, monospace`;
+    ctx.textAlign = "center"; ctx.fillText(flashMsg, cw / 2, ch / 2);
+  }
+}
+
+// spinning demo piece behind the title menu
+function drawAttract(now) {
+  drawPit();
+
+  const t = now / 1000;
+  const cells = P.TWR;
+  const edges = outlineEdges(cells).map(e => e.map(v => {
+    let r = [v[0] - 1, v[1] - 1, v[2] - 1];
+    r = rotVec(r, 0, t * .7); r = rotVec(r, 1, t * .9); r = rotVec(r, 2, t * .4);
+    return [r[0] + W / 2, r[1] + D / 2, r[2] + H * .35];
+  }));
+  drawEdges(edges, "#ffffff", 2);
+}
+
+// ---------- Loop ----------
+function frame(now) {
+  const dt = Math.min(100, now - (lastT || now));
+  lastT = now;
+  if (state === "play" && piece) {
+    dropTimer += dt;
+    if (dropTimer >= gravityMs()) {
+      dropTimer = 0;
+      if (!tryMove([0,0,1])) lock();
+    }
+  } else if (state === "clearing") {
+    if (now - clearTimer > 420) finishClear();
+  }
+  render(now);
+  requestAnimationFrame(frame);
+}
+
+
+// ---------- Input ----------
+const actions = {
+  left:  () => tryMove([-1,0,0]),
+  right: () => tryMove([1,0,0]),
+  up:    () => tryMove([0,-1,0]),
+  down:  () => tryMove([0,1,0]),
+  rx: () => tryRotate(0, 1), rX: () => tryRotate(0, -1),
+  ry: () => tryRotate(1, 1), rY: () => tryRotate(1, -1),
+  rz: () => tryRotate(2, 1), rZ: () => tryRotate(2, -1),
+  drop: () => hardDrop(),
+};
+const keymap = {
+  ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down",
+  KeyQ: "rx", KeyW: "ry", KeyE: "rz", KeyA: "rX", KeyS: "rY", KeyD: "rZ",
+  Space: "drop",
+};
+
+addEventListener("keydown", e => {
+  ensureAudio();
+  if (e.code === "Escape") {
+    if (state === "play" || state === "paused") { state = "paused"; showMainMenu(true); }
+    e.preventDefault(); return;
+  }
+  if (e.code === "KeyP") { togglePause(); e.preventDefault(); return; }
+  if (e.code === "KeyG") { ghost = !ghost; store.set("ghost", ghost); return; }
+  if (e.code === "KeyM") { sound = !sound; store.set("sound", sound); return; }
+  const a = keymap[e.code];
+  if (!a || state !== "play") return;
+  e.preventDefault();
+  if (a === "drop" && e.repeat) return;
+  actions[a]();
+});
+
+document.querySelectorAll("#touch button").forEach(b => {
+  b.addEventListener("pointerdown", e => {
+    e.preventDefault(); ensureAudio();
+    if (state === "play") actions[b.dataset.k]();
+  });
+});
+
+function togglePause() {
+  if (state === "play") { state = "paused"; showMenu('<div class="msg">PAUSED</div>', "RESUME"); }
+  else if (state === "paused") resume();
+}
+function resume() { state = "play"; overlay.hidden = true; lastT = 0; document.activeElement?.blur(); }
+
+// ---------- Menus ----------
+function showMenu(html, primary = "PLAY AGAIN") {
+  overlay.hidden = false;
+  overlay.innerHTML = `<div class="menu">${html}
+    <div class="modes"><button id="mPrimary">${primary}</button><button id="mMenu">MAIN MENU</button></div></div>`;
+  $("mPrimary").onclick = () => (state === "paused" ? resume() : newGame());
+  $("mMenu").onclick = () => showMainMenu(false);
+  $("mPrimary").focus();
+}
+
+function showMainMenu(fromPause) {
+  if (!fromPause) { state = "menu"; }
+  overlay.hidden = false;
+  const cust = store.get("custom", { w: 5, d: 5, h: 12, set: "basic" });
+  const opts = (lo, hi, v) => Array.from({ length: hi - lo + 1 }, (_, i) => lo + i).map(n => `<option ${n === v ? "selected" : ""}>${n}</option>`).join("");
+  overlay.innerHTML = `<div class="menu">
+    <h1 class="title">CUBEWELL</h1>
+    <div class="sub">DROP · ROTATE · CLEAR THE LAYERS</div>
+    <div class="modes">${MODES.map(m => `<button class="mode ${m.id === modeId ? "sel" : ""}" data-m="${m.id}">${m.label}<small>${m.desc}</small></button>`).join("")}</div>
+    <div class="custom" id="custom" ${modeId === "custom" ? "" : "hidden"}>
+      <span>Width</span><select id="cw">${opts(3, 7, cust.w)}</select>
+      <span>Depth</span><select id="cd">${opts(3, 7, cust.d)}</select>
+      <span>Height</span><select id="ch">${opts(6, 18, cust.h)}</select>
+      <span>Pieces</span><select id="cs">${Object.keys(SETS).map(k => `<option value="${k}" ${k === cust.set ? "selected" : ""}>${SETS[k].name}</option>`).join("")}</select>
+    </div>
+    <div class="custom"><span>Start level</span><select id="lv">${opts(0, 9, startLevel)}</select></div>
+    <div class="modes">
+      ${fromPause ? '<button id="mResume">RESUME</button>' : ""}
+      <button id="mStart">${fromPause ? "NEW GAME" : "START"}</button>
+    </div>
+  </div>`;
+  overlay.querySelectorAll("[data-m]").forEach(b => b.onclick = () => {
+    modeId = b.dataset.m; store.set("mode", modeId);
+    overlay.querySelectorAll("[data-m]").forEach(x => x.classList.toggle("sel", x === b));
+    $("custom").hidden = modeId !== "custom";
+  });
+  if (fromPause) $("mResume").onclick = () => resume();
+  $("mStart").onclick = () => {
+    startLevel = +$("lv").value; store.set("startLevel", startLevel);
+    if (modeId === "custom") {
+      const c = { w: +$("cw").value, d: +$("cd").value, h: +$("ch").value, set: $("cs").value };
+      store.set("custom", c);
+      W = c.w; D = c.d; H = c.h; setKey = c.set;
+    } else {
+      const m = MODES.find(m => m.id === modeId);
+      W = m.w; D = m.d; H = m.h; setKey = m.set;
+    }
+    newGame();
+  };
+  $("mStart").focus();
+}
+
+// ---------- Sound ----------
+let actx = null;
+function ensureAudio() {
+  if (actx) { if (actx.state === "suspended") actx.resume(); return; }
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { actx = null; }
+}
+function beep(freq, dur, type = "square", vol = .05) {
+  if (!sound || !actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + dur);
+  o.connect(g).connect(actx.destination);
+  o.start(); o.stop(actx.currentTime + dur);
+}
+
+// ---------- Boot ----------
+modeId = store.get("mode", "flat");
+startLevel = store.get("startLevel", 0);
+addEventListener("resize", () => { resize(); });
+resize();
+buildMeter();
+updateHud();
+showMainMenu(false);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
