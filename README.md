@@ -18,6 +18,19 @@ You look straight down into a pit and drop 3D pieces into it. A layer disappears
 | P | Pause |
 | Esc | Menu |
 
+### Mouse
+
+| Mouse | Action |
+| --- | --- |
+| Move | Piece follows the pointer |
+| Double-click | Drop |
+| Scroll wheel | Spin flat (Z) |
+| Right-click | Spin flat (Z) |
+| Right-drag left / right | Roll sideways (Y) |
+| Right-drag up / down | Tip forward / back (X) |
+
+Pressing any key hands control back to the keyboard until the mouse moves again.
+
 Touch devices get on-screen buttons.
 
 ## Modes

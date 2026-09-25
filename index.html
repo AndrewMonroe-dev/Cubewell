@@ -22,7 +22,7 @@
     flex-direction: column-reverse; padding: 2px; gap: 2px; flex: none; }
   #meter div { flex: 1; background: #050505; }
   #wrap { position: relative; flex: none; }
-  canvas { display: block; background: #000; }
+  canvas { display: block; background: #000; cursor: crosshair; }
   #hud { width: 190px; flex: none; display: flex; flex-direction: column; gap: 10px; }
   .box { border: 2px solid var(--line); padding: 8px 10px; background: var(--panel); }
   .box h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .15em; color: var(--dim); font-weight: normal; }
@@ -93,7 +93,14 @@
       <b>A S D</b> rotate back<br>
       <b>SPACE</b> drop<br>
       <b>G</b> ghost &nbsp; <b>M</b> sound<br>
-      <b>P</b> pause &nbsp; <b>ESC</b> menu
+      <b>P</b> pause &nbsp; <b>ESC</b> menu<br>
+      <span style="display:block;margin-top:6px;color:var(--text)">MOUSE</span>
+      <b>move</b> steer<br>
+      <b>double-click</b> drop<br>
+      <b>wheel</b> spin flat (Z)<br>
+      <b>right-click</b> spin flat (Z)<br>
+      <b>right-drag ↔</b> roll (Y)<br>
+      <b>right-drag ↕</b> tip (X)
     </div>
   </div>
   <div id="touch">
@@ -545,6 +552,7 @@ function frame(now) {
   const dt = Math.min(100, now - (lastT || now));
   lastT = now;
   if (state === "play" && piece) {
+    if (mouse.active && !mouse.rdown) followMouse();
     dropTimer += dt;
     if (dropTimer >= gravityMs()) {
       dropTimer = 0;
@@ -588,8 +596,80 @@ addEventListener("keydown", e => {
   if (!a || state !== "play") return;
   e.preventDefault();
   if (a === "drop" && e.repeat) return;
+  mouse.active = false;   // keyboard takes over until the mouse moves again
   actions[a]();
 });
+
+// ---------- Mouse ----------
+// move = steer, double-click = drop, wheel / right-click = spin flat,
+// right-drag left-right = roll sideways, right-drag up-down = tip forward/back
+const mouse = { active: false, x: 0, y: 0, rdown: false, rx: 0, ry: 0, twisted: false, wheel: 0, wheelT: 0, wheelLast: 0 };
+const TWIST_PX = 36;
+
+function followMouse() {
+  const r = cv.getBoundingClientRect();
+  // map the pointer onto the pit opening so the whole canvas is usable at any depth
+  const wx = W / 2 + (mouse.x - r.left - cw / 2) / scale;
+  const wy = D / 2 + (mouse.y - r.top - ch / 2) / scale;
+  for (let i = 0; i < 12; i++) {
+    const c = bboxCenter(piece.cells);
+    const dx = wx - c[0], dy = wy - c[1];
+    let moved = false;
+    if (Math.abs(dx) > .6) moved = tryMove([Math.sign(dx), 0, 0]) || moved;
+    if (Math.abs(dy) > .6) moved = tryMove([0, Math.sign(dy), 0]) || moved;
+    if (!moved) break;
+  }
+}
+
+addEventListener("pointermove", e => {
+  if (e.pointerType !== "mouse") return;
+  if (mouse.rdown) {
+    const dx = e.clientX - mouse.rx, dy = e.clientY - mouse.ry;
+    if (state !== "play") return;
+    if (Math.abs(dx) >= TWIST_PX && Math.abs(dx) >= Math.abs(dy)) {
+      actions[dx > 0 ? "rY" : "ry"]();
+      mouse.rx += Math.sign(dx) * TWIST_PX; mouse.ry = e.clientY; mouse.twisted = true;
+    } else if (Math.abs(dy) >= TWIST_PX) {
+      actions[dy > 0 ? "rx" : "rX"]();
+      mouse.ry += Math.sign(dy) * TWIST_PX; mouse.rx = e.clientX; mouse.twisted = true;
+    }
+    return;
+  }
+  if (Math.hypot(e.clientX - mouse.x, e.clientY - mouse.y) > 2) mouse.active = true;
+  mouse.x = e.clientX; mouse.y = e.clientY;
+  if (mouse.active && state === "play" && piece) followMouse();
+});
+
+cv.addEventListener("pointerdown", e => {
+  if (e.pointerType !== "mouse") return;
+  ensureAudio();
+  if (e.button === 2) {
+    mouse.rdown = true; mouse.twisted = false;
+    mouse.rx = e.clientX; mouse.ry = e.clientY;
+    cv.setPointerCapture(e.pointerId);
+  }
+});
+addEventListener("pointerup", e => {
+  if (e.pointerType !== "mouse" || e.button !== 2 || !mouse.rdown) return;
+  mouse.rdown = false;
+  if (!mouse.twisted && state === "play") actions.rz();
+  // steer from where the pointer ended up, without a jump on the next nudge
+  mouse.x = e.clientX; mouse.y = e.clientY;
+});
+cv.addEventListener("dblclick", e => { e.preventDefault(); if (state === "play") actions.drop(); });
+cv.addEventListener("contextmenu", e => e.preventDefault());
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (state !== "play") return;
+  const now = performance.now();
+  if (now - mouse.wheelLast > 300) mouse.wheel = 0;   // new scroll gesture
+  mouse.wheelLast = now;
+  mouse.wheel += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+  if (Math.abs(mouse.wheel) >= 50 && now - mouse.wheelT > 90) {   // one notch = one turn
+    actions[mouse.wheel > 0 ? "rz" : "rZ"]();
+    mouse.wheel = 0; mouse.wheelT = now;
+  }
+}, { passive: false });
 
 document.querySelectorAll("#touch button").forEach(b => {
   b.addEventListener("pointerdown", e => {
