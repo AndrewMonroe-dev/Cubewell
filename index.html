@@ -139,6 +139,13 @@
     text-shadow: 0 0 20px rgba(212,255,58,.35); }
 
   /* ---- touch + narrow screens ---- */
+  @media (min-width: 801px) and (min-aspect-ratio: 1001/1000) {
+    #wrap { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; }
+    #hud { position: fixed; right: 12px; top: 50%; transform: translateY(-50%); z-index: 2;
+      max-height: calc(100vh - 16px); overflow: hidden; }
+    #traceCol { position: fixed; left: 14px; top: 50%; transform: translateY(-50%); z-index: 2; }
+  }
+  .fs { width: 100%; text-align: center; font-size: 11px; letter-spacing: .25em; padding: 8px 0; }
   #touch { display: none; }
   @media (pointer: coarse) { #touch { display: grid; } }
   @media (max-width: 800px), (max-aspect-ratio: 1/1) {
@@ -173,6 +180,7 @@
     <div id="overlay"></div>
   </div>
   <div id="hud">
+    <button class="fs" data-fs title="Full screen (F)">⛶ FULL SCREEN</button>
     <div class="box"><h3>DATA EXFILTRATED</h3><div class="big" id="score">0 B</div></div>
     <div class="box">
       <div class="row"><span>SEC TIER</span><b id="level">0</b></div>
@@ -197,7 +205,7 @@
     <div class="box keys-box keys">
       <b>← → ↑ ↓</b> move &nbsp; <b>SPACE</b> drop<br>
       <b>Q W E</b> rotate X Y Z · <b>A S D</b> back<br>
-      <b>G</b> ghost · <b>M</b> sound · <b>P</b> pause · <b>ESC</b> menu<br>
+      <b>G</b> ghost · <b>M</b> sound · <b>P</b> pause · <b>F</b> full screen · <b>ESC</b> menu<br>
       <b>mouse</b> steer · <b>dbl-click</b> drop<br>
       <b>wheel</b>/<b>right-click</b> spin · <b>right-drag</b> tumble<br>
       or click the <b>ROTATE</b> pad
@@ -339,7 +347,9 @@ function resize() {
     const reserved = 70 + (touch ? 140 : 0);
     size = Math.min(innerWidth - 16, innerHeight - reserved);
   } else {
-    size = Math.min(innerHeight - 24, innerWidth - 50 - 240 - 80);
+    const full = Math.min(innerHeight - 12, innerWidth - 12);
+    const besides = innerWidth - 2 * 268;   // width left once the side panels have room on both sides
+    size = Math.min(full, Math.max(besides, full * .8));
   }
   size = Math.max(220, Math.floor(size));
   const aspect = W / D;
@@ -350,8 +360,8 @@ function resize() {
   cv.style.width = cw + "px"; cv.style.height = ch + "px";
   $("meter").style.height = Math.max(120, ch - 130) + "px";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  scale = Math.min(cw / W, ch / D) * 0.96;
-  camF = H * 0.75;
+  scale = Math.min(cw / W, ch / D) * 0.985;
+  camF = H * 0.95;   // flatter perspective keeps the deep layers large enough to read
 }
 
 // ---------- Game flow ----------
@@ -956,6 +966,7 @@ addEventListener("keydown", e => {
     e.preventDefault(); return;
   }
   if (e.code === "KeyP") { togglePause(); e.preventDefault(); return; }
+  if (e.code === "KeyF") { toggleFullscreen(); e.preventDefault(); return; }
   if (e.code === "KeyG") { ghost = !ghost; store.set("ghost", ghost); return; }
   if (e.code === "KeyM") {
     sound = !sound; store.set("sound", sound);
@@ -1080,6 +1091,20 @@ document.querySelectorAll("#touch button, .pad button").forEach(b => {
   });
 });
 
+// full screen hides the browser bars so the pit can use the whole monitor
+function toggleFullscreen() {
+  const el = document.documentElement;
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else (el.requestFullscreen || el.webkitRequestFullscreen).call(el).catch?.(() => {});
+  } catch {}
+}
+document.addEventListener("fullscreenchange", () => {
+  document.querySelectorAll("[data-fs]").forEach(b => b.textContent = document.fullscreenElement ? "⛶ EXIT FULL SCREEN" : "⛶ FULL SCREEN");
+  resize(); resizeRain();
+});
+document.querySelectorAll("#hud [data-fs]").forEach(b => b.addEventListener("click", () => { toggleFullscreen(); b.blur(); }));
+
 function togglePause() {
   if (state === "play") { state = "paused"; sfx.pause(); sfx.humOff(); showMenu('<div class="msg ok">SESSION SUSPENDED</div><div class="msg2">UPLINK HELD · TRACE FROZEN</div>', "RESUME SESSION"); }
   else if (state === "paused") resume();
@@ -1119,6 +1144,7 @@ function showMainMenu(fromPause) {
     <div class="modes">
       ${fromPause ? '<button id="mResume">RESUME SESSION</button>' : ""}
       <button id="mStart" class="go">${fromPause ? "NEW TARGET" : "INITIATE BREACH"}</button>
+      <button class="fs" data-fs title="Full screen (F)">${document.fullscreenElement ? "⛶ EXIT FULL SCREEN" : "⛶ FULL SCREEN"}</button>
     </div>
   </div>`;
   overlay.querySelectorAll("[data-m]").forEach(b => b.onclick = () => {
@@ -1141,6 +1167,7 @@ function showMainMenu(fromPause) {
     }
     newGame();
   };
+  overlay.querySelectorAll("[data-fs]").forEach(b => b.onclick = toggleFullscreen);
   $("mStart").focus();
   bootText();
 }

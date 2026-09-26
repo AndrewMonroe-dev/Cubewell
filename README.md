@@ -17,6 +17,7 @@ The trace meter rises as the stack grows. If it reaches the top, the trace compl
 | G | Toggle landing ghost |
 | M | Toggle sound |
 | P | Pause |
+| F | Full screen |
 | Esc | Menu |
 
 ### Mouse
