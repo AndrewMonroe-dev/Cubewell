@@ -68,12 +68,23 @@
   .keys b { color: var(--text); font-weight: 500; }
   #log { height: 150px; overflow: hidden; font-size: 10.5px; line-height: 1.55; display: flex;
     flex-direction: column; justify-content: flex-end; white-space: nowrap; color: var(--dim); }
-  #log div { overflow: hidden; text-overflow: ellipsis; animation: slidein .25s ease-out; }
+  #log div { overflow: hidden; text-overflow: ellipsis; animation: fadein .3s ease-out; }
+  @keyframes fadein { from { opacity: 0; } }
   @keyframes slidein { from { opacity: 0; transform: translateX(-6px); } }
   #log .ok { color: var(--glow); } #log .warn { color: var(--warn); } #log .bad { color: var(--bad); }
   #log div:last-child::after { content: ""; display: inline-block; width: 6px; height: 11px; margin-left: 4px;
     vertical-align: -1px; background: var(--glow); animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
+  .pad { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px 6px; align-items: center; margin-top: 4px; }
+  .pad span { font-family: var(--disp); font-weight: 600; font-size: 10px; letter-spacing: .2em; color: var(--dim); padding-right: 4px; }
+  .pad button { padding: 7px 0; text-align: center; font-size: 15px; letter-spacing: 0;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+  .pad button:active { background: rgba(0,255,120,.3); }
+  .pad .drop { grid-column: 1 / -1; margin-top: 2px; font-size: 13px; letter-spacing: .3em; color: #02140a;
+    background: linear-gradient(90deg, var(--glow), var(--cyan)); }
+  @media (pointer: coarse) { .pad-box { display: none; } }
+  @media (max-height: 900px) { #log { height: 96px; } .info-box { display: none; } }
+  @media (max-height: 760px) { .keys-box { display: none; } }
   [hidden] { display: none !important; }
 
   /* ---- menus ---- */
@@ -135,7 +146,7 @@
     #traceCol { display: none; }
     #hud { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 6px; order: -1; }
     #hud .box { flex: 1 1 0; padding: 5px 8px 5px 10px; min-width: 0; }
-    #hud .keys-box, #hud .info-box, #hud .log-box { display: none; }
+    #hud .keys-box, #hud .info-box, #hud .log-box, #hud .pad-box { display: none; }
     .big { font-size: 22px; }
     .row { line-height: 1.5; }
     .modes:has(.mode) { grid-template-columns: 1fr; }
@@ -174,12 +185,22 @@
       <div class="row"><span>EXPLOIT</span><b id="setname">FLAT</b></div>
     </div>
     <div class="box log-box"><h3>SESSION LOG</h3><div id="log"></div></div>
+    <div class="box pad-box">
+      <h3>ROTATE</h3>
+      <div class="pad">
+        <span>TIP</span><button data-k="rX" title="Tip backward (A)">▲</button><button data-k="rx" title="Tip forward (Q)">▼</button>
+        <span>ROLL</span><button data-k="ry" title="Roll left (W)">◀</button><button data-k="rY" title="Roll right (S)">▶</button>
+        <span>SPIN</span><button data-k="rZ" title="Spin counter-clockwise (D)">↺</button><button data-k="rz" title="Spin clockwise (E)">↻</button>
+        <button data-k="drop" class="drop" title="Drop (Space)">DROP</button>
+      </div>
+    </div>
     <div class="box keys-box keys">
       <b>← → ↑ ↓</b> move &nbsp; <b>SPACE</b> drop<br>
       <b>Q W E</b> rotate X Y Z · <b>A S D</b> back<br>
       <b>G</b> ghost · <b>M</b> sound · <b>P</b> pause · <b>ESC</b> menu<br>
       <b>mouse</b> steer · <b>dbl-click</b> drop<br>
-      <b>wheel</b>/<b>right-click</b> spin · <b>right-drag</b> tumble
+      <b>wheel</b>/<b>right-click</b> spin · <b>right-drag</b> tumble<br>
+      or click the <b>ROTATE</b> pad
     </div>
   </div>
   <div id="touch">
@@ -249,7 +270,7 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem("cubewell." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem("cubewell." + k, JSON.stringify(v)); } catch {} },
 };
-ghost = store.get("ghost", false);
+ghost = store.get("ghost", true);
 sound = store.get("sound", true);
 
 const idx = (x, y, z) => (z * D + y) * W + x;
@@ -381,6 +402,7 @@ function spawn() {
   if (!fits(cells)) { piece = { cells }; gameOver(); return; }
   piece = { cells };
   dropTimer = 0;
+  mouse.off = [0, 0];   // fresh piece: mouse steering is absolute again
   sfx.tick();
   log(`> ${PAYLOADS[Math.floor(Math.random() * PAYLOADS.length)]} 0x${hex(4)}`, "sys");
 }
@@ -938,7 +960,7 @@ addEventListener("keydown", e => {
 // ---------- Mouse ----------
 // move = steer, double-click = drop, wheel / right-click = spin flat,
 // right-drag left-right = roll sideways, right-drag up-down = tip forward/back
-const mouse = { active: false, x: 0, y: 0, rdown: false, rx: 0, ry: 0, twisted: false, axis: null, twistT: 0,
+const mouse = { active: false, x: 0, y: 0, off: [0, 0], rdown: false, rx: 0, ry: 0, twisted: false, axis: null, twistT: 0,
                 wheel: 0, wheelT: 0, wheelLast: 0 };
 // rotation sensitivity: drag distance per quarter-turn and the minimum pause between turns
 const SENS = {
@@ -949,11 +971,19 @@ const SENS = {
 let sensKey = store.get("sens", "medium");
 if (!SENS[sensKey]) sensKey = "medium";
 
-function followMouse() {
+// where the pointer is in pit coordinates, at the depth of the piece top, so the piece sits under the cursor
+function pointerWorld(x = mouse.x, y = mouse.y) {
   const r = cv.getBoundingClientRect();
-  // map the pointer onto the pit opening so the whole canvas is usable at any depth
-  const wx = W / 2 + (mouse.x - r.left - cw / 2) / scale;
-  const wy = D / 2 + (mouse.y - r.top - ch / 2) / scale;
+  const sx = x - r.left, sy = y - r.top;
+  if (sx < 0 || sy < 0 || sx > cw || sy > ch) return null;   // only steer while over the pit
+  const k = camF / (camF + Math.min(...piece.cells.map(c => c[2])));
+  return [W / 2 + (sx - cw / 2) / (scale * k), D / 2 + (sy - ch / 2) / (scale * k)];
+}
+
+function followMouse() {
+  const p = pointerWorld();
+  if (!p) return;
+  const wx = p[0] + mouse.off[0], wy = p[1] + mouse.off[1];
   let any = false;
   for (let i = 0; i < 12; i++) {
     const c = bboxCenter(piece.cells);
@@ -1005,11 +1035,16 @@ addEventListener("pointerup", e => {
   mouse.rdown = false;
   // a plain right-click spins; a drag that started but never completed a turn does nothing
   if (!mouse.twisted && !mouse.axis && state === "play") actions.rz();
-  // steer from where the pointer ended up, without a jump on the next nudge
   mouse.x = e.clientX; mouse.y = e.clientY;
+  // the drag moved the pointer away from the piece: steer relative to here so nothing jumps
+  if (mouse.axis && piece) {
+    const p = pointerWorld(), c = bboxCenter(piece.cells);
+    if (p) mouse.off = [c[0] - p[0], c[1] - p[1]];
+  }
 });
 cv.addEventListener("dblclick", e => { e.preventDefault(); if (state === "play") actions.drop(); });
-cv.addEventListener("contextmenu", e => e.preventDefault());
+// right-click is a game control everywhere on the page, never the browser menu
+addEventListener("contextmenu", e => e.preventDefault());
 cv.addEventListener("wheel", e => {
   e.preventDefault();
   if (state !== "play") return;
@@ -1024,7 +1059,7 @@ cv.addEventListener("wheel", e => {
   }
 }, { passive: false });
 
-document.querySelectorAll("#touch button").forEach(b => {
+document.querySelectorAll("#touch button, .pad button").forEach(b => {
   b.addEventListener("pointerdown", e => {
     e.preventDefault(); ensureAudio();
     if (state === "play") actions[b.dataset.k]();

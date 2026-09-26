@@ -29,8 +29,9 @@ The trace meter rises as the stack grows. If it reaches the top, the trace compl
 | Right-click | Spin flat (Z) |
 | Right-drag left / right | Roll sideways (Y) |
 | Right-drag up / down | Tip forward / back (X) |
+| ROTATE pad (side panel) | Click to tip, roll, spin or drop |
 
-Pressing any key hands control back to the keyboard until the mouse moves again.
+The piece follows the cursor only while the pointer is over the pit. Pressing any key hands control back to the keyboard until the mouse moves again. The landing ghost is on by default; press **G** to hide it.
 
 **Rotation sensitivity** (Low / Medium / High, in the menu) sets how far you right-drag per quarter-turn and the minimum pause between turns. Holding a rotate key does not auto-repeat.
 
