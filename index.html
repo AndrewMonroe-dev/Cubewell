@@ -562,7 +562,21 @@ function log(text, cls = "") {
 
 // ---------- Trace meter ----------
 // colour by height: safe green at the bottom, amber, then red near the top of the firewall
-function layerHue(layerFromBottom) { return 140 - 140 * Math.min(1, layerFromBottom / Math.max(1, H - 1)); }
+// layer colour schemes double as a difficulty setting: the more alike the layers, the harder depth is to read
+const COLOR_MODES = {
+  distinct: { label: "DISTINCT" },   // every layer a clearly different hue
+  gradient: { label: "GRADIENT" },   // green to amber to red as the stack rises
+  mono:     { label: "MONO" },       // one colour: hardest
+};
+// ordered so neighbouring layers are always far apart on the colour wheel
+const DISTINCT_HUES = [190, 120, 300, 48, 220, 20, 160, 330, 80, 265, 0, 140];
+let colorMode = store.get("colors", "distinct");
+if (!COLOR_MODES[colorMode]) colorMode = "distinct";
+function layerHue(layerFromBottom) {
+  if (colorMode === "distinct") return DISTINCT_HUES[layerFromBottom % DISTINCT_HUES.length];
+  if (colorMode === "mono") return 145;
+  return 140 - 140 * Math.min(1, layerFromBottom / Math.max(1, H - 1));
+}
 
 function buildMeter() {
   const m = $("meter"); m.innerHTML = "";
@@ -1100,7 +1114,8 @@ function showMainMenu(fromPause) {
       <span>Exploit kit</span><select id="cs">${Object.keys(SETS).map(k => `<option value="${k}" ${k === cust.set ? "selected" : ""}>${SETS[k].name}</option>`).join("")}</select>
     </div>
     <div class="custom"><span>Security tier</span><select id="lv">${opts(0, 9, startLevel)}</select>
-      <span>Rotation sensitivity</span><select id="sens">${Object.keys(SENS).map(k => `<option value="${k}" ${k === sensKey ? "selected" : ""}>${SENS[k].label}</option>`).join("")}</select></div>
+      <span>Rotation sensitivity</span><select id="sens">${Object.keys(SENS).map(k => `<option value="${k}" ${k === sensKey ? "selected" : ""}>${SENS[k].label}</option>`).join("")}</select>
+      <span>Layer colors</span><select id="colors">${Object.keys(COLOR_MODES).map(k => `<option value="${k}" ${k === colorMode ? "selected" : ""}>${COLOR_MODES[k].label}</option>`).join("")}</select></div>
     <div class="modes">
       ${fromPause ? '<button id="mResume">RESUME SESSION</button>' : ""}
       <button id="mStart" class="go">${fromPause ? "NEW TARGET" : "INITIATE BREACH"}</button>
@@ -1115,6 +1130,7 @@ function showMainMenu(fromPause) {
   $("mStart").onclick = () => {
     startLevel = +$("lv").value; store.set("startLevel", startLevel);
     sensKey = $("sens").value; store.set("sens", sensKey);
+    colorMode = $("colors").value; store.set("colors", colorMode);
     if (modeId === "custom") {
       const c = { w: +$("cw").value, d: +$("cd").value, h: +$("ch").value, set: $("cs").value };
       store.set("custom", c);
